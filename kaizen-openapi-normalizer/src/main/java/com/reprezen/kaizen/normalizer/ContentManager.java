@@ -31,12 +31,24 @@ public class ContentManager<E extends Enum<E> & Component> {
 		this.machine = machine;
 	}
 
+	public Content<E> load(String refString, Reference base, String scanState) {
+		return load(new Reference(refString, base), machine.getState(scanState));
+	}
+
+	public Content<E> load(String refString, Reference base, E scanStateValue) {
+		return load(new Reference(refString, base), machine.getState(scanStateValue));
+	}
+
 	public Content<E> load(String refString, Reference base, State<E> scanState) {
 		return load(new Reference(refString, base), scanState);
 	}
 
 	public Content<E> load(Reference ref, String scanState) {
 		return load(ref, machine.getState(scanState));
+	}
+
+	public Content<E> load(Reference ref, E scanStateValue) {
+		return load(ref, machine.getState(scanStateValue));
 	}
 
 	public Content<E> load(Reference ref, State<E> scanState) {
@@ -113,6 +125,10 @@ public class ContentManager<E extends Enum<E> & Component> {
 			contentCache.put(ref, new Content<E>(ref, invalidReason));
 		}
 		return contentCache.get(ref);
+	}
+
+	public StateMachine<E> getMachine() {
+		return machine;
 	}
 
 	private Content<E> loadDoc(Reference ref, State<E> scanState) {

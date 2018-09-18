@@ -1,5 +1,12 @@
 package com.reprezen.kaizen.normalizer.test;
 
+import static com.reprezen.kaizen.normalizer.v2.V2State.MODEL;
+import static com.reprezen.kaizen.normalizer.v2.V2State.PARAMETER;
+import static com.reprezen.kaizen.normalizer.v2.V2State.PATH;
+import static com.reprezen.kaizen.normalizer.v2.V2State.RESPONSE;
+import static com.reprezen.kaizen.normalizer.v2.V2State.SCHEMA;
+import static com.reprezen.kaizen.normalizer.v2.V2State.SCHEMA_DEF;
+
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
@@ -17,15 +24,16 @@ import com.reprezen.kaizen.normalizer.Options;
 import com.reprezen.kaizen.normalizer.Reference;
 import com.reprezen.kaizen.normalizer.ReferenceScanner.ScanOp;
 import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v2.V2StateMachine;
 
 public class ContentManagerTest extends NormalizerTestBase {
 
-	private ContentManager cm;
-	private Content doc;
+	private ContentManager<V2State> cm;
+	private Content<V2State> doc;
 
 	@Before
 	public void setup() {
-		this.cm = new ContentManager(new Options());
+		this.cm = new ContentManager<V2State>(new Options(), new V2StateMachine());
 		Reference ref = new Reference(getYamlFileUrl("StateWalkV2"));
 		this.doc = cm.load(ref, V2State.MODEL);
 	}
@@ -43,21 +51,22 @@ public class ContentManagerTest extends NormalizerTestBase {
 
 	@Test
 	public void testLoadSubTree() {
-		Content activities = cm.load(new Reference("#/definitions/Activities", doc.getRef(), V2State.SCHEMA_DEF));
+		Content<V2State> activities = cm.load(new Reference("#/definitions/Activities", doc.getRef(), SCHEMA_DEF),
+				SCHEMA_DEF);
 		assertTrue(activities.isValid());
 		assert (activities.getTree() == doc.at("/definitions/Activities"));
 	}
 
 	@Test
 	public void testNotFound() {
-		Content notFound = cm.load(new Reference("./xxx.yaml", doc.getRef(), V2State.MODEL));
+		Content<V2State> notFound = cm.load(new Reference("./xxx.yaml", doc.getRef(), MODEL), MODEL);
 		assertFalse(notFound.isValid());
 		assertTrue(notFound.getInvalidReason().toLowerCase().contains("no such file"));
 	}
 
 	@Test
 	public void testCantParse() {
-		Content cantParse = cm.load(new Reference("./shopping-list.txt", doc.getRef(), V2State.MODEL));
+		Content<V2State> cantParse = cm.load(new Reference("./shopping-list.txt", doc.getRef(), MODEL), MODEL);
 		assertFalse(cantParse.isValid());
 		assertTrue(cantParse.getInvalidReason().toLowerCase().contains("does not contain valid yaml"));
 	}
@@ -65,19 +74,20 @@ public class ContentManagerTest extends NormalizerTestBase {
 	@Test
 	public void testSubtreeNotFound() {
 		// lower-case schema name is incorrect
-		Content subtree = cm.load(new Reference("#/definitions/activities", doc.getRef()), V2State.SCHEMA);
+		Content<V2State> subtree = cm.load(new Reference("#/definitions/activities", doc.getRef()), SCHEMA);
 		assertFalse(subtree.isValid());
 		assertTrue(subtree.getInvalidReason().toLowerCase().contains("no json value at specified pointer"));
 	}
 
 	@Test
 	public void loadScanTest() {
-		Content model = cm.load(new Reference("LoadScanTest.yaml", doc.getRef(), V2State.MODEL), V2State.MODEL);
+		Content<V2State> model = cm.load(new Reference("LoadScanTest.yaml", doc.getRef(), V2State.MODEL),
+				V2State.MODEL);
 		model.scan(ScanOp.LOAD);
 
 		assertTrue(model.at("/info/title").isTextual());
 		assertEquals("Load Scan Test", model.at("/info/title").asText());
-		Content titleContent = cm.load(new Reference("#/info/title", model.getRef()), null);
+		Content<V2State> titleContent = cm.load(new Reference("#/info/title", model.getRef()), (V2State) null);
 		assertTrue(titleContent.isValid());
 		assertEquals(model.at("/info/title"), titleContent.getTree());
 
@@ -99,7 +109,7 @@ public class ContentManagerTest extends NormalizerTestBase {
 
 	@Test
 	public void componentScanTest() {
-		Content model = cm.load(new Reference("uber.yaml", doc.getRef(), V2State.MODEL));
+		Content<V2State> model = cm.load(new Reference("uber.yaml", doc.getRef(), MODEL), MODEL);
 		model.scan(ScanOp.LOAD);
 		model.scan(ScanOp.COMPONENTS);
 		checkDefinitions(V2State.PATH, "/products", "/estimates/price", "/estimates/time", "/me", "/history");
@@ -110,21 +120,22 @@ public class ContentManagerTest extends NormalizerTestBase {
 
 	@Test
 	public void testPolicyPhase_inline() {
-		cm = new ContentManager(Options.of(Option.INLINE_ALL));
-		Content model = cm.load(new Reference("multifile-uber.yaml", doc.getRef(), V2State.MODEL), V2State.MODEL);
+		cm = new ContentManager<V2State>(Options.of(Option.INLINE_ALL), new V2StateMachine());
+		Content<V2State> model = cm.load(new Reference("multifile-uber.yaml", doc.getRef(), MODEL), MODEL);
 		model.scan(ScanOp.LOAD);
 		model.scan(ScanOp.COMPONENTS);
 		model.scan(ScanOp.POLICY);
-		checkDefinitions(V2State.PATH, "/products", "/estimates/price", "/estimates/time", "/me", "/history");
-		checkDefinitions(V2State.SCHEMA);
-		checkDefinitions(V2State.PARAMETER);
-		checkDefinitions(V2State.RESPONSE);
+		checkDefinitions(PATH, "/products", "/estimates/price", "/estimates/time", "/me", "/history");
+		checkDefinitions(SCHEMA);
+		checkDefinitions(PARAMETER);
+		checkDefinitions(RESPONSE);
 	}
 
 	@Test
 	public void testPolicyPhase_localize() {
-		cm = new ContentManager(Options.of(Option.INLINE_NONE));
-		Content model = cm.load(new Reference("multifile-uber.yaml", doc.getRef(), V2State.MODEL), V2State.MODEL);
+		cm = new ContentManager<V2State>(Options.of(Option.INLINE_NONE), new V2StateMachine());
+		Content<V2State> model = cm.load(new Reference("multifile-uber.yaml", doc.getRef(), V2State.MODEL),
+				V2State.MODEL);
 		model.scan(ScanOp.LOAD);
 		model.scan(ScanOp.COMPONENTS);
 		model.scan(ScanOp.POLICY);

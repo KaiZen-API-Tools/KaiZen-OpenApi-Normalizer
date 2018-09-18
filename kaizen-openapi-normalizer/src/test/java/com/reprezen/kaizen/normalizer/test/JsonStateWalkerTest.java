@@ -36,7 +36,7 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 	@Before
 	public void setup() throws JsonProcessingException, IOException {
 		this.tree = loadYaml("walkTest");
-		this.machine = new StateMachine<S>(S.ANON, S.OFF);
+		this.machine = new StateMachine<S>(S.class, S.ANON, S.OFF);
 		machine.transit().from(S.TOP).via("a").to(S.A);
 		machine.transit().from(S.TOP).via("b").to(S.B);
 		machine.transit().from(S.TOP).via("c").to(S.C);

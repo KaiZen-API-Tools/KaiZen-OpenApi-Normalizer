@@ -38,6 +38,7 @@ public class ReferenceScanner<E extends Enum<E> & Component> {
 		this.scanOp = scanOp;
 		this.contentManager = contentManager;
 		this.options = options;
+		this.machine = contentManager.getMachine();
 	}
 
 	public JsonNode scan() {
