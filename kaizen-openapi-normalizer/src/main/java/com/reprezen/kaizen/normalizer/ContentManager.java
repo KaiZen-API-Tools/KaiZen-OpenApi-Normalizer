@@ -16,32 +16,36 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.snakeyaml.scanner.ScannerException;
 import com.reprezen.kaizen.normalizer.Localizer.LocalizedContent;
+import com.reprezen.kaizen.normalizer.util.StateMachine;
+import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 
-public class ContentManager {
+public class ContentManager<E extends Enum<E> & Component> {
 
-	private Map<Reference, Content> contentCache = new HashMap<>();
+	private Map<Reference, Content<E>> contentCache = new HashMap<>();
 	private Localizer localizer = new Localizer();
 	private Options options;
+	private StateMachine<E> machine;
 
-	public ContentManager(Options options) {
+	public ContentManager(Options options, StateMachine<E> machine) {
 		this.options = options;
+		this.machine = machine;
 	}
 
-	public Content load(Reference ref) {
-		return load(ref, V2State.MODEL);
-	}
-
-	public Content load(String refString, Reference base, V2State scanState) {
+	public Content<E> load(String refString, Reference base, State<E> scanState) {
 		return load(new Reference(refString, base), scanState);
 	}
 
-	public Content load(Reference ref, V2State scanState) {
+	public Content<E> load(Reference ref, String scanState) {
+		return load(ref, machine.getState(scanState));
+	}
+
+	public Content<E> load(Reference ref, State<E> scanState) {
 		if (contentCache.containsKey(ref)) {
 			return contentCache.get(ref);
 		} else if (!ref.isValid()) {
 			return createInvalidContent(ref, ref.getInvalidReason());
 		}
-		Content doc = loadDoc(ref, ref.equals(ref.getUrlRef()) ? scanState : null);
+		Content<E> doc = loadDoc(ref, ref.equals(ref.getUrlRef()) ? scanState : null);
 		if (contentCache.containsKey(ref)) {
 			return contentCache.get(ref);
 		}
@@ -89,29 +93,29 @@ public class ContentManager {
 		return localizer.getLocalizedContent(ref);
 	}
 
-	public Content createContent(Reference ref, JsonNode tree, V2State scanState) {
+	public Content<E> createContent(Reference ref, JsonNode tree, State<E> scanState) {
 		if (contentCache.containsKey(ref)) {
 			throw duplicateContent(ref);
 		} else {
-			contentCache.put(ref, new Content(ref, tree, scanState, this, options));
+			contentCache.put(ref, new Content<E>(ref, tree, scanState, this, options));
 		}
 		return contentCache.get(ref);
 	}
 
-	public Content createInvalidContent(Reference ref) {
+	public Content<E> createInvalidContent(Reference ref) {
 		return createInvalidContent(ref, ref.getInvalidReason());
 	}
 
-	public Content createInvalidContent(Reference ref, String invalidReason) {
+	public Content<E> createInvalidContent(Reference ref, String invalidReason) {
 		if (contentCache.containsKey(ref)) {
 			throw duplicateContent(ref);
 		} else {
-			contentCache.put(ref, new Content(ref, invalidReason));
+			contentCache.put(ref, new Content<E>(ref, invalidReason));
 		}
 		return contentCache.get(ref);
 	}
 
-	private Content loadDoc(Reference ref, V2State scanState) {
+	private Content<E> loadDoc(Reference ref, State<E> scanState) {
 		String text;
 		Reference rootRef = ref.getUrlRef();
 		if (contentCache.containsKey(rootRef)) {

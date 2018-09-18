@@ -16,7 +16,7 @@ import com.reprezen.kaizen.normalizer.Option;
 import com.reprezen.kaizen.normalizer.Options;
 import com.reprezen.kaizen.normalizer.Reference;
 import com.reprezen.kaizen.normalizer.ReferenceScanner.ScanOp;
-import com.reprezen.kaizen.normalizer.V2State;
+import com.reprezen.kaizen.normalizer.v2.V2State;
 
 public class ContentManagerTest extends NormalizerTestBase {
 

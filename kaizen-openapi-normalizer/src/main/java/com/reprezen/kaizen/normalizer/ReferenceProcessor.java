@@ -16,25 +16,30 @@ import com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition;
 import com.reprezen.kaizen.normalizer.util.StateMachine;
 import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
+import com.reprezen.kaizen.normalizer.v2.V2State;
 
-public class ReferenceProcessor {
+public class ReferenceProcessor<E extends Enum<E> & Component> {
 	private Options options;
-	private ContentManager contentManager;
+	private ContentManager<E> contentManager;
+	private StateMachine<E> machine;
+	private State<E> modelState;
 
-	private ReferenceProcessor(Option... options) {
-		this(Options.of(options));
+	private ReferenceProcessor(StateMachine<E> machine, Option... options) {
+		this(machine, Options.of(options));
 	}
 
-	private ReferenceProcessor(Options options) {
+	private ReferenceProcessor(StateMachine<E> machine, Options options) {
 		this.options = options;
-		this.contentManager = new ContentManager(options);
+		this.contentManager = new ContentManager<E>(options, machine);
+		this.machine = machine;
+		this.modelState = machine.getState("MODEL");
 	}
 
 	public JsonNode process(URL sourceModel) {
-		List<Content> models = new ArrayList<>();
-		models.add(contentManager.load(new Reference(sourceModel)));
+		List<Content<E>> models = new ArrayList<>();
+		models.add(contentManager.load(new Reference(sourceModel), modelState));
 		for (URL additionalFile : options.getAdditionalFileUrls()) {
-			models.add(contentManager.load(new Reference(additionalFile)));
+			models.add(contentManager.load(new Reference(additionalFile), modelState));
 		}
 		inlineNonConformingRefs(models);
 		localizeComponents(models);
@@ -42,47 +47,45 @@ public class ReferenceProcessor {
 		return buildNormalizedModel(models.get(0));
 	}
 
-	private void inlineNonConformingRefs(List<Content> models) {
-		for (Content model : models) {
+	private void inlineNonConformingRefs(List<Content<E>> models) {
+		for (Content<E> model : models) {
 			model.scan(ScanOp.LOAD);
 		}
 	}
 
-	private void localizeComponents(List<Content> models) {
-		for (Content model : models) {
+	private void localizeComponents(List<Content<E>> models) {
+		for (Content<E> model : models) {
 			model.scan(ScanOp.COMPONENTS);
 		}
 	}
 
-	private void applyPolicy(List<Content> models) {
-		for (Content model : models) {
+	private void applyPolicy(List<Content<E>> models) {
+		for (Content<E> model : models) {
 			model.scan(ScanOp.POLICY);
 		}
 	}
 
-	private JsonNode buildNormalizedModel(Content topModel) {
+	private JsonNode buildNormalizedModel(Content<E> topModel) {
 		ObjectNode result = JsonNodeFactory.instance.objectNode();
 		copyOtherElements(topModel.getTree(), result);
 		return result;
 	}
 
 	private void copyOtherElements(JsonNode model, ObjectNode result) {
-		StateMachine<V2State> machine = new StateMachine<V2State>();
-		Tracker<V2State> tracker = machine.tracker(V2State.MODEL);
-		OtherElementWalkMethod walkMethod = new OtherElementWalkMethod(result, tracker);
-		new JsonStateWalker<>(tracker, walkMethod, true, true).walk(model);
+		Tracker<E> tracker = machine.tracker(modelState);
+		OtherElementWalkMethod<E> walkMethod = new OtherElementWalkMethod<E>(result);
+		new JsonStateWalker<E>(tracker, walkMethod, true, true).walk(model);
 	}
 
-	private static class OtherElementWalkMethod implements AdvancedWalkMethod<V2State> {
+	private static class OtherElementWalkMethod<E extends Enum<E> & Component> implements AdvancedWalkMethod<E> {
 		private JsonNode target;
 
-		public OtherElementWalkMethod(JsonNode copyTo, Tracker<V2State> tracker) {
+		public OtherElementWalkMethod(JsonNode copyTo) {
 			this.target = copyTo;
 		}
 
 		@Override
-		public Disposition walk(JsonNode node, State<V2State> state, V2State stateValue, List<Object> path,
-				JsonPointer pointer) {
+		public Disposition walk(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer) {
 			if (stateValue == V2State.OFFROAD) {
 				JsonCopier.copy(node, target, path);
 				return Disposition.done();

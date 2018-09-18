@@ -28,7 +28,7 @@ public class ComponentUtil {
 		return instance;
 	}
 
-	/* package */ String lowerCamelName(Component comp) {
+	public String lowerCamelName(Component comp) {
 		final Pattern newWord = Pattern.compile("_[a-z]");
 		Matcher m = newWord.matcher(comp.name().toLowerCase());
 		StringBuffer sb = new StringBuffer();
@@ -39,7 +39,7 @@ public class ComponentUtil {
 		return sb.toString();
 	}
 
-	/* pacakge */static Pattern makeNameRegex(String v2Container, String v3Container) {
+	public static Pattern makeNameRegex(String v2Container, String v3Container) {
 		String prefixes = Arrays.asList( //
 				v2Container != null ? "/" + v2Container : null, //
 				v3Container != null ? "/components/" + v3Container : null) //
@@ -47,7 +47,7 @@ public class ComponentUtil {
 		return Pattern.compile(String.format("(%s)/([^/]+)", prefixes));
 	}
 
-	/* package */String getFileName(String path) {
+	public String getFileName(String path) {
 		if (path.contains("/")) {
 			String last = path.substring(path.lastIndexOf('/'));
 			return last.isEmpty() ? null //
@@ -57,14 +57,14 @@ public class ComponentUtil {
 		}
 	}
 
-	/* package */ String getDefaultName(String path, Pattern regex, String fileName, Component component) {
+	public String getDefaultName(String path, Pattern regex, String fileName, Component component) {
 		Matcher m = regex.matcher(path);
 		return m.matches() ? fixName(m.group(2))
 				: fileName != null ? fileName + "_" + component.name() : component.name();
 
 	}
 
-	/* package */ String fixName(String name) {
+	public String fixName(String name) {
 		return name.replaceAll("[^A-Za-z0-9._-]", "_");
 	}
 }

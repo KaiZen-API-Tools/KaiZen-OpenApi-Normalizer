@@ -1,9 +1,12 @@
-package com.reprezen.kaizen.normalizer;
+package com.reprezen.kaizen.normalizer.v2;
 
 import static com.reprezen.kaizen.normalizer.ComponentUtil.makeNameRegex;
 
 import java.net.URL;
 import java.util.regex.Pattern;
+
+import com.reprezen.kaizen.normalizer.Component;
+import com.reprezen.kaizen.normalizer.ComponentUtil;
 
 public enum V2State implements Component {
 	MODEL, // root of model specification

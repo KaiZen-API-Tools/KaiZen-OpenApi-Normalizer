@@ -64,12 +64,14 @@ public class StateMachine<E extends Enum<E>> {
 	private Map<State<E>, Map<String, State<E>>> graph = new IdentityHashMap<>();
 	private E anonymousValue = null;
 	private E offRoadValue = null;
+	private Class<E> stateClass;
 
 	/**
 	 * Create a new state machine instance, with no special values for anonymous and
 	 * off-road states.
 	 */
-	public StateMachine() {
+	public StateMachine(Class<E> stateClass) {
+		this(stateClass, null, null);
 	}
 
 	/**
@@ -81,7 +83,8 @@ public class StateMachine<E extends Enum<E>> {
 	 * @param offRoadValue
 	 *            value to be used for off-road states, or null for none
 	 */
-	public StateMachine(E anonymousValue, E offRoadValue) {
+	public StateMachine(Class<E> stateClass, E anonymousValue, E offRoadValue) {
+		this.stateClass = stateClass;
 		this.anonymousValue = anonymousValue;
 		this.offRoadValue = offRoadValue;
 	}
@@ -206,6 +209,10 @@ public class StateMachine<E extends Enum<E>> {
 			namedStates.put(name, state);
 		}
 		return namedStates.get(name);
+	}
+
+	public State<E> getState(String name) {
+		return getState(Enum.valueOf(stateClass, name));
 	}
 
 	private Map<String, State<E>> getOutEdges(State<E> state) {

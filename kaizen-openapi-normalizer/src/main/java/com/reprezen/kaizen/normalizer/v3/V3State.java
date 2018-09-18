@@ -1,6 +1,9 @@
-package com.reprezen.kaizen.normalizer;
+package com.reprezen.kaizen.normalizer.v3;
 
 import java.net.URL;
+
+import com.reprezen.kaizen.normalizer.Component;
+import com.reprezen.kaizen.normalizer.ComponentUtil;
 
 public enum V3State implements Component {
 	MODEL, // root of model specificaiton

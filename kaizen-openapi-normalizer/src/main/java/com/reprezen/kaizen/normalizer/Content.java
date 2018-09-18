@@ -3,20 +3,21 @@ package com.reprezen.kaizen.normalizer;
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.reprezen.kaizen.normalizer.ReferenceScanner.ScanOp;
+import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 
-public class Content {
+public class Content<E extends Enum<E> & Component> {
 	private Reference ref;
 	private JsonNode tree;
-	private V2State scanState;
+	private State<E> scanState;
 	private boolean valid;
 	private String invalidReason = null;
-	private ContentManager contentManager;
+	private ContentManager<E> contentManager;
 	private Options options;
 
-	Content(Reference ref, JsonNode tree, V2State scanState, ContentManager contentManager, Options options) {
+	Content(Reference ref, JsonNode tree, State<E> scanState2, ContentManager<E> contentManager, Options options) {
 		this.ref = ref;
 		this.tree = tree;
-		this.scanState = scanState;
+		this.scanState = scanState2;
 		this.valid = true;
 		this.contentManager = contentManager;
 		this.options = options;
@@ -29,7 +30,7 @@ public class Content {
 	}
 
 	public void scan(ScanOp scanOp) {
-		this.tree = new ReferenceScanner(tree, ref, scanOp, contentManager, options).scan(scanState);
+		this.tree = new ReferenceScanner<E>(tree, ref, scanOp, contentManager, options).scan(scanState);
 	}
 
 	public Reference getRef() {

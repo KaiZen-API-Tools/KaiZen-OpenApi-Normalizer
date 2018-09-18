@@ -1,9 +1,9 @@
 package com.reprezen.kaizen.normalizer.test;
 
-import static com.reprezen.kaizen.normalizer.V2State.PARAMETER;
-import static com.reprezen.kaizen.normalizer.V2State.PATH;
-import static com.reprezen.kaizen.normalizer.V2State.RESPONSE;
-import static com.reprezen.kaizen.normalizer.V2State.SCHEMA;
+import static com.reprezen.kaizen.normalizer.v2.V2State.PARAMETER;
+import static com.reprezen.kaizen.normalizer.v2.V2State.PATH;
+import static com.reprezen.kaizen.normalizer.v2.V2State.RESPONSE;
+import static com.reprezen.kaizen.normalizer.v2.V2State.SCHEMA;
 
 import java.io.IOException;
 import java.util.HashMap;
@@ -15,11 +15,11 @@ import org.junit.Test;
 import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.reprezen.kaizen.normalizer.V2State;
-import com.reprezen.kaizen.normalizer.V2StateMachine;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker;
 import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
+import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v2.V2StateMachine;
 
 public class V2StateWalkTest extends NormalizerTestBase {
 
