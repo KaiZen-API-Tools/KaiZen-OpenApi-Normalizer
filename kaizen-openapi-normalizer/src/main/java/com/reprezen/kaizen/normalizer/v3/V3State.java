@@ -17,7 +17,10 @@ public enum V3State implements Component {
 	HEADER, HEADER_DEF, //
 	SECURITY_SCHEME, SECURITY_SCHEME_DEF, //
 	LINK, LINK_DEF, //
-	CALLBACK, CALLBACK_DEF, OPERATION, // anywhere an operation object is allowed
+	CALLBACK, CALLBACK_DEF, //
+	OPERATION, //
+	MEDIA_TYPE, //
+	ENCODING, //
 	ANON, OFFROAD; // anonymous and off-road states all use these values
 
 	// note this must be initialized prior to executing the following static block
