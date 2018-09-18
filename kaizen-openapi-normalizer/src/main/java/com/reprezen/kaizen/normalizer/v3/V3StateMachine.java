@@ -96,9 +96,9 @@ public class V3StateMachine extends StateMachine<V3State> {
 		transit().from(PATH).via("trace").to(OPERATION);
 
 		// ways to get to a media type object
-		transit().from(PARAMETER).via("content").to(MEDIA_TYPE);
-		transit().from(REQUEST_BODY).via("content").to(MEDIA_TYPE);
-		transit().from(RESPONSE).via("content").to(MEDIA_TYPE);
+		transit().from(PARAMETER).via("content", "*").to(MEDIA_TYPE);
+		transit().from(REQUEST_BODY).via("content", "*").to(MEDIA_TYPE);
+		transit().from(RESPONSE).via("content", "*").to(MEDIA_TYPE);
 
 		// ways to get to an encoding object
 		transit().from(MEDIA_TYPE).via("encoding", "*").to(ENCODING);
