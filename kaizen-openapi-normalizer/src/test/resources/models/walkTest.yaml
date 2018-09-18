@@ -1,0 +1,10 @@
+a:
+  a:
+    b:
+      - hello
+      - foo
+      - {}
+      - [1,2,3]
+  b: [ blah ]
+c: whatever
+      

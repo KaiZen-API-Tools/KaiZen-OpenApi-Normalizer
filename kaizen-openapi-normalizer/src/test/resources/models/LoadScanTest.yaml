@@ -1,0 +1,23 @@
+swagger: "2.0"
+info:
+  title: 
+    $ref: "parts/title.txt"
+  version: "1.0"
+  contact:
+    $ref: "parts/contact.yaml"
+paths:
+  /foo:
+    get:
+      parameters:
+      - $ref: "#/parameters/param0"
+      responses:
+        200:
+          description: simple response
+          schema:
+            $ref: "parts/xxx.yaml"
+            
+parameters:
+  param0:
+    name: xxx
+    in: query
+    type: string

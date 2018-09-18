@@ -1,0 +1,31 @@
+---
+# This is a sample multi-file Swagger spec, describing a simple Uber API.
+# The files comprising this project demonstrate local and cross-file
+# references.
+swagger: "2.0"
+info:
+  title: Uber API
+  description: Move your app forward with the Uber API
+  version: "1.0.0"
+# the domain of the service
+host: api.uber.com
+# array of all schemes that your API supports
+schemes:
+  - https
+# will be prefixed to all paths
+basePath: /v1
+produces:
+  - application/json
+
+paths:
+
+  /products:
+    $ref: "./uber-components/uber_path_products.yaml#/paths/~1products"
+  /estimates/price:
+    $ref: "./uber-components/uber_path_estimates_price.yaml#/paths/~1price"
+  /estimates/time:
+    $ref: "./uber-components/uber_path_estimates_time.yaml#/paths/~1time"
+  /me:
+    $ref: "./uber-components/uber_path_user.yaml#/paths/~1user"
+  /history:
+    $ref: "./uber-components/uber_path_history.yaml#/paths/~1history"

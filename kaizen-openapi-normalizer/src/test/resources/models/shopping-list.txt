@@ -1,0 +1,5 @@
+- Groceries:
+Milk
+Chocolate Therapy ice cream
+More Chocolate Therapy ice cream
+eggs
