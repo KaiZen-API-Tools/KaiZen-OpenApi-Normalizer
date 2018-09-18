@@ -13,6 +13,7 @@ import com.reprezen.kaizen.normalizer.Reference.ReferenceTreatment;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker.AdvancedWalkMethod;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition;
+import com.reprezen.kaizen.normalizer.util.StateMachine;
 import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
 
@@ -22,51 +23,52 @@ import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
  * @author Andy Lowry
  *
  */
-public class ReferenceScanner {
-	private static V2StateMachine machine = new V2StateMachine();
+public class ReferenceScanner<E extends Enum<E> & Component> {
+	private StateMachine<E> machine;
 	private JsonNode tree;
 	private Reference base;
 	private ScanOp scanOp;
-	private ContentManager contentManager;
+	private ContentManager<E> contentManager;
 	private Options options;
 
-	public ReferenceScanner(JsonNode tree, Reference base, ScanOp scanOp, ContentManager contentManager,
+	public ReferenceScanner(JsonNode tree, Reference base, ScanOp scanOp, ContentManager<E> contentManager,
 			Options options) {
 		this.tree = tree;
 		this.base = base;
 		this.scanOp = scanOp;
 		this.contentManager = contentManager;
 		this.options = options;
+		this.machine = contentManager.getMachine();
 	}
 
 	public JsonNode scan() {
-		return scan(V2State.MODEL);
+		return scan(machine.getState("MODEL"));
 	}
 
-	public JsonNode scan(V2State start) {
+	public JsonNode scan(E start) {
 		return scan(machine.getState(start));
 	}
 
-	public JsonNode scan(State<V2State> startState) {
-		Tracker<V2State> tracker = machine.tracker(startState);
-		Walkers walkers = new Walkers(base, contentManager, options);
-		AdvancedWalkMethod<V2State> walkMethod = walkers.getWalkMethod(scanOp, startState.getValue());
-		Optional<JsonNode> newNode = new JsonStateWalker<V2State>(tracker, walkMethod).walk(tree);
+	public JsonNode scan(State<E> startState) {
+		Tracker<E> tracker = machine.tracker(startState);
+		Walkers<E> walkers = new Walkers<E>(base, contentManager, options);
+		AdvancedWalkMethod<E> walkMethod = walkers.getWalkMethod(scanOp);
+		Optional<JsonNode> newNode = new JsonStateWalker<E>(tracker, walkMethod).walk(tree);
 		return newNode.orElse(tree);
 	}
 
-	private static class Walkers {
+	private static class Walkers<E extends Enum<E> & Component> {
 		private Reference base;
-		private ContentManager contentManager;
+		private ContentManager<E> contentManager;
 		private Options options;
 
-		public Walkers(Reference base, ContentManager contentManager, Options options) {
+		public Walkers(Reference base, ContentManager<E> contentManager, Options options) {
 			this.base = base;
 			this.contentManager = contentManager;
 			this.options = options;
 		}
 
-		public <E extends Enum<E> & Component> AdvancedWalkMethod<E> getWalkMethod(ScanOp scanOp, E examplar) {
+		public AdvancedWalkMethod<E> getWalkMethod(ScanOp scanOp) {
 			switch (scanOp) {
 			case LOAD:
 				return this::loadWalkMethod;
@@ -90,8 +92,8 @@ public class ReferenceScanner {
 		 * </ol>
 		 *
 		 */
-		public <E extends Enum<E> & Component> Disposition loadWalkMethod(JsonNode node, State<E> state, E stateValue,
-				List<Object> path, JsonPointer pointer) {
+		public Disposition loadWalkMethod(JsonNode node, State<E> state, E stateValue, List<Object> path,
+				JsonPointer pointer) {
 			if (Reference.isRefNode(node)) {
 				Reference ref = new Reference(getRefString(node).get(), base, stateValue);
 				if (options.isRewriteSimpleRefs()) {
@@ -102,7 +104,7 @@ public class ReferenceScanner {
 					// inline and re-walk non-conforming ref, but if we can't load it, replace it
 					// with an adorned ref node
 					// TODO handle cycles
-					Content toInline = contentManager.load(ref, (V2State) stateValue);
+					Content<E> toInline = contentManager.load(ref, state);
 					return toInline.isValid() ? Disposition.rewalk(toInline.copyTree())
 							: Disposition.done(toInline.getRef().getRefNode());
 				}
@@ -129,8 +131,8 @@ public class ReferenceScanner {
 		 * <p>
 		 * Scan args: none
 		 */
-		public <E extends Enum<E> & Component> Disposition componentWalkMethod(JsonNode node, State<E> state,
-				E stateValue, List<Object> path, JsonPointer pointer) {
+		public Disposition componentWalkMethod(JsonNode node, State<E> state, E stateValue, List<Object> path,
+				JsonPointer pointer) {
 			if (stateValue.isDefiningSite()) {
 				if (stateValue.hasMergeSemantics()) {
 					// this is for paths - the definition may or may not have a reference. If it
@@ -180,8 +182,8 @@ public class ReferenceScanner {
 		 * <li>boolean - whether to fix simple refs when scanning new content inlined or
 		 * localized content</li>
 		 */
-		public <E extends Enum<E> & Component> Disposition policyWalkMethod(JsonNode node, State<E> state, E stateValue,
-				List<Object> path, JsonPointer pointer) {
+		public Disposition policyWalkMethod(JsonNode node, State<E> state, E stateValue, List<Object> path,
+				JsonPointer pointer) {
 			if (Reference.isRefNode(node) && stateValue.isConformingSite()) {
 				Reference ref = new Reference(getRefString(node).get(), base, stateValue);
 				ReferenceTreatment treatment = ref.getTreatment(options);
@@ -189,7 +191,7 @@ public class ReferenceScanner {
 				case INLINE_NONCONFORMING: {
 					// same behavior as in the LOAD phase walk method
 					// TODO handle cycles
-					Content toInline = contentManager.load(ref, (V2State) stateValue);
+					Content<E> toInline = contentManager.load(ref, state);
 					toInline.scan(ScanOp.LOAD);
 					return toInline.isValid() ? Disposition.rewalk(toInline.copyTree())
 							: Disposition.done(toInline.getRef().getRefNode(false));
@@ -198,7 +200,7 @@ public class ReferenceScanner {
 					// almost the same, but if this reference creates a cycle, we localize it
 					// instead of throwing an exception
 					// TODO handle cycles
-					Content toInline = contentManager.load(ref, (V2State) stateValue);
+					Content<E> toInline = contentManager.load(ref, state);
 					if (toInline.isValid()) {
 						toInline.scan(ScanOp.LOAD);
 					}
@@ -206,7 +208,7 @@ public class ReferenceScanner {
 							: Disposition.done(toInline.getRef().getRefNode(false));
 				}
 				case LOCALIZE: {
-					Content toLocalize = contentManager.load(ref, (V2State) stateValue);
+					Content<E> toLocalize = contentManager.load(ref, state);
 					if (toLocalize.isValid()) {
 						toLocalize.scan(ScanOp.LOAD);
 						toLocalize.scan(ScanOp.POLICY);
@@ -220,7 +222,7 @@ public class ReferenceScanner {
 				case MERGE: {
 					// here's where we actually handle the reference in a path item, having
 					// localized the path's non-ref content previously.
-					Content toMerge = contentManager.load(ref, (V2State) stateValue);
+					Content<E> toMerge = contentManager.load(ref, state);
 					if (toMerge.isValid()) {
 						toMerge.scan(ScanOp.LOAD);
 						toMerge.scan(ScanOp.POLICY);

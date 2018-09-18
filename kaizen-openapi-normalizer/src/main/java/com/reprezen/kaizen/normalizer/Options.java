@@ -24,6 +24,8 @@ import com.reprezen.kaizen.normalizer.Option.HoistType;
 import com.reprezen.kaizen.normalizer.Option.OptionType;
 import com.reprezen.kaizen.normalizer.Option.OrderingScheme;
 import com.reprezen.kaizen.normalizer.Option.RetentionScopeType;
+import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v3.V3State;
 
 public class Options {
 	private final Map<Option.OptionType, Object> options = Maps.newHashMap();

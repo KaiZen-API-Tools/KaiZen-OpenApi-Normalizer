@@ -8,6 +8,8 @@ import static com.reprezen.kaizen.normalizer.Option.OptionType.RETENTION_SCOPE;
 import java.util.Set;
 
 import com.google.common.collect.ImmutableSet;
+import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v3.V3State;
 
 /**
  * Options for normalizer behavior.

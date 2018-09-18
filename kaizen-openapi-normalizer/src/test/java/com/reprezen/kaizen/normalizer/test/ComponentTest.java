@@ -3,8 +3,8 @@ package com.reprezen.kaizen.normalizer.test;
 import org.junit.Assert;
 import org.junit.Test;
 
-import com.reprezen.kaizen.normalizer.V2State;
-import com.reprezen.kaizen.normalizer.V3State;
+import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v3.V3State;
 
 /**
  * We do some tricky stuff configuring state enums, so this just makes sure

@@ -1,10 +1,10 @@
 package com.reprezen.kaizen.normalizer.test;
 
-import static com.reprezen.kaizen.normalizer.test.StateMachineTest.TestState.A;
-import static com.reprezen.kaizen.normalizer.test.StateMachineTest.TestState.ANON;
-import static com.reprezen.kaizen.normalizer.test.StateMachineTest.TestState.B;
-import static com.reprezen.kaizen.normalizer.test.StateMachineTest.TestState.C;
-import static com.reprezen.kaizen.normalizer.test.StateMachineTest.TestState.OFF_ROAD;
+import static com.reprezen.kaizen.normalizer.test.StateMachineTest.S.A;
+import static com.reprezen.kaizen.normalizer.test.StateMachineTest.S.ANON;
+import static com.reprezen.kaizen.normalizer.test.StateMachineTest.S.B;
+import static com.reprezen.kaizen.normalizer.test.StateMachineTest.S.C;
+import static com.reprezen.kaizen.normalizer.test.StateMachineTest.S.OFF_ROAD;
 
 import java.util.Arrays;
 
@@ -17,11 +17,11 @@ import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
 
 public class StateMachineTest extends Assert {
 
-	private StateMachine<TestState> machine;
+	private StateMachine<S> machine;
 
 	@Before
 	public void createMachine() {
-		machine = new StateMachine<TestState>();
+		machine = new StateMachine<S>(S.class);
 		defineTransits();
 	}
 
@@ -42,8 +42,8 @@ public class StateMachineTest extends Assert {
 		performSimpleMoves();
 	}
 
-	private Tracker<TestState> performSimpleMoves() {
-		Tracker<TestState> tracker = machine.tracker(A);
+	private Tracker<S> performSimpleMoves() {
+		Tracker<S> tracker = machine.tracker(A);
 		checkState(tracker, A);
 		checkMove(tracker, "x", null);
 		checkPath(tracker, "x");
@@ -67,7 +67,7 @@ public class StateMachineTest extends Assert {
 
 	@Test
 	public void testBackup() {
-		Tracker<TestState> tracker = performSimpleMoves();
+		Tracker<S> tracker = performSimpleMoves();
 		checkBackup(tracker, 1, B);
 		checkPath(tracker, "x", "hello", "y", 10, 20);
 		checkBackup(tracker, 2, B);
@@ -84,7 +84,7 @@ public class StateMachineTest extends Assert {
 
 	@Test
 	public void testSharedPath() {
-		Tracker<TestState> tracker = machine.tracker(A);
+		Tracker<S> tracker = machine.tracker(A);
 		checkMove(tracker, "x", null);
 		checkMove(tracker, "shortcut", C);
 		checkPath(tracker, "x", "shortcut");
@@ -95,7 +95,7 @@ public class StateMachineTest extends Assert {
 
 	@Test
 	public void testOffRoad() {
-		Tracker<TestState> tracker = performSimpleMoves();
+		Tracker<S> tracker = performSimpleMoves();
 		checkOffRoadMove(tracker, "uh oh");
 		checkOffRoadMove(tracker, 1);
 		checkPath(tracker, "x", "hello", "y", 10, 20, "done", "uh oh", 1);
@@ -105,9 +105,9 @@ public class StateMachineTest extends Assert {
 
 	@Test
 	public void testSpecialValues() {
-		machine = new StateMachine<TestState>(ANON, OFF_ROAD);
+		machine = new StateMachine<S>(S.class, ANON, OFF_ROAD);
 		defineTransits();
-		Tracker<TestState> tracker = machine.tracker(A);
+		Tracker<S> tracker = machine.tracker(A);
 		checkMove(tracker, "x", ANON);
 		checkMove(tracker, "blah", ANON);
 		checkMove(tracker, "y", B);
@@ -117,31 +117,31 @@ public class StateMachineTest extends Assert {
 		checkBackup(tracker, 1, A);
 	}
 
-	private void checkState(Tracker<TestState> tracker, TestState expected) {
+	private void checkState(Tracker<S> tracker, S expected) {
 		assertEquals(expected, tracker.getCurrentState().getValue());
 	}
 
-	private void checkMove(Tracker<TestState> tracker, String value, TestState expected) {
+	private void checkMove(Tracker<S> tracker, String value, S expected) {
 		tracker.move(value);
 		checkState(tracker, expected);
 	}
 
-	private void checkMove(Tracker<TestState> tracker, int value, TestState expected) {
+	private void checkMove(Tracker<S> tracker, int value, S expected) {
 		tracker.move(value);
 		checkState(tracker, expected);
 	}
 
-	private void checkOffRoadMove(Tracker<TestState> tracker, String value) {
+	private void checkOffRoadMove(Tracker<S> tracker, String value) {
 		tracker.move(value);
 		assertNull(tracker.getCurrentState());
 	}
 
-	private void checkOffRoadMove(Tracker<TestState> tracker, int value) {
+	private void checkOffRoadMove(Tracker<S> tracker, int value) {
 		tracker.move(value);
 		assertNull(tracker.getCurrentState());
 	}
 
-	private void checkBackup(Tracker<TestState> tracker, int n, TestState expected) {
+	private void checkBackup(Tracker<S> tracker, int n, S expected) {
 		if (n == 1) {
 			tracker.backup();
 		} else {
@@ -150,7 +150,7 @@ public class StateMachineTest extends Assert {
 		checkState(tracker, expected);
 	}
 
-	public void checkBadBackup(Tracker<TestState> tracker, int n) {
+	public void checkBadBackup(Tracker<S> tracker, int n) {
 		try {
 			tracker.backup(n);
 			fail("Backing up too far should have thrown exception");
@@ -158,11 +158,11 @@ public class StateMachineTest extends Assert {
 		}
 	}
 
-	private void checkPath(Tracker<TestState> tracker, Object... expectedPath) {
+	private void checkPath(Tracker<S> tracker, Object... expectedPath) {
 		assertEquals(Arrays.asList(expectedPath), tracker.getPath());
 	}
 
-	public static enum TestState {
+	public static enum S {
 		A, B, C, ANON, OFF_ROAD;
 	}
 }

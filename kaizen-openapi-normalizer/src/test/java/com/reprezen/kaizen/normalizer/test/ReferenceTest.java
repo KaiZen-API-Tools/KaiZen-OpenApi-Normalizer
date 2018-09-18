@@ -13,8 +13,8 @@ import com.fasterxml.jackson.core.JsonPointer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.reprezen.kaizen.normalizer.Component;
 import com.reprezen.kaizen.normalizer.Reference;
-import com.reprezen.kaizen.normalizer.V2State;
-import com.reprezen.kaizen.normalizer.V3State;
+import com.reprezen.kaizen.normalizer.v2.V2State;
+import com.reprezen.kaizen.normalizer.v3.V3State;
 
 public class ReferenceTest extends NormalizerTestBase {
 
