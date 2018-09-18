@@ -31,10 +31,10 @@ public class StateMachineTest extends Assert {
 		//                 ⇙ ⇖
 		//                 int
 		//
-		machine.transit().from(A).via("x", "*", "y").to(B);
 		machine.transit().from(A).via("x", "shortcut").to(C);
 		machine.transit().from(B).via("#").to(B);
 		machine.transit().from(B).via("done").to(C);
+		machine.transit().from(A).via("x", "*", "y").to(B);
 	}
 
 	@Test

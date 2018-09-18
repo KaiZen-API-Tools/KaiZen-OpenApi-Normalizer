@@ -36,16 +36,16 @@ public class V3StateMachine extends StateMachine<V3State> {
 		// Set up all state transitions to use while traversing OpenAPI v3 model spec
 
 		// ways to get to component definitions
-		transit().from(MODEL).via("paths", "*").to(PATH);
-		transit().from(MODEL).via("components", "schemas", "*").to(SCHEMA_DEF);
-		transit().from(MODEL).via("components", "responses", "*").to(RESPONSE_DEF);
-		transit().from(MODEL).via("components", "parameters", "*").to(PARAMETER_DEF);
-		transit().from(MODEL).via("components", "examples", "*").to(EXAMPLE_DEF);
-		transit().from(MODEL).via("components", "requestBodies", "*").to(REQUEST_BODY_DEF);
-		transit().from(MODEL).via("components", "headers", "*").to(HEADER_DEF);
-		transit().from(MODEL).via("components", "securitySchemes", "*").to(SECURITY_SCHEME_DEF);
-		transit().from(MODEL).via("components", "links", "*").to(LINK_DEF);
-		transit().from(MODEL).via("components", "callbacks", "*").to(CALLBACK_DEF);
+		transit().from(MODEL).via("paths", "re: /.*").to(PATH);
+		transit().from(MODEL).via("components", "schemas", "re: (?!x-)[A-Za-z0-9._-]+").to(SCHEMA_DEF);
+		transit().from(MODEL).via("components", "responses", "re: (?!x-)[A-Za-z0-9._-]+").to(RESPONSE_DEF);
+		transit().from(MODEL).via("components", "parameters", "re: (?!x-)[A-Za-z0-9._-]+").to(PARAMETER_DEF);
+		transit().from(MODEL).via("components", "examples", "re: (?!x-)[A-Za-z0-9._-]+").to(EXAMPLE_DEF);
+		transit().from(MODEL).via("components", "requestBodies", "re: (?!x-)[A-Za-z0-9._-]+").to(REQUEST_BODY_DEF);
+		transit().from(MODEL).via("components", "headers", "re: (?!x-)[A-Za-z0-9._-]+").to(HEADER_DEF);
+		transit().from(MODEL).via("components", "securitySchemes", "re: (?!x-)[A-Za-z0-9._-]+").to(SECURITY_SCHEME_DEF);
+		transit().from(MODEL).via("components", "links", "re: (?!x-)[A-Za-z0-9._-]+").to(LINK_DEF);
+		transit().from(MODEL).via("components", "callbacks", "re: (?!x-)[A-Za-z0-9._-]+").to(CALLBACK_DEF);
 
 		// ways to get to a schema object
 		transit().from(PARAMETER).via("schema").to(SCHEMA);

@@ -24,10 +24,10 @@ public class V2StateMachine extends StateMachine<V2State> {
 		// Set up all state transitions to use while traversing a Swagger model spec
 
 		// ways to get to object definitions
-		transit().from(MODEL).via("paths", "*").to(PATH);
-		transit().from(MODEL).via("definitions", "*").to(SCHEMA_DEF);
-		transit().from(MODEL).via("responses", "*").to(RESPONSE_DEF);
-		transit().from(MODEL).via("parameters", "*").to(PARAMETER_DEF);
+		transit().from(MODEL).via("paths", "re: /.*").to(PATH);
+		transit().from(MODEL).via("definitions", "re: (?!x-)[a-zA-Z0-9._-]+").to(SCHEMA_DEF);
+		transit().from(MODEL).via("responses", "re: (?!x-)[a-zA-Z0-9._-]+").to(RESPONSE_DEF);
+		transit().from(MODEL).via("parameters", "re: (?!x-)[a-zA-Z0-9._-]+").to(PARAMETER_DEF);
 
 		// ways to get to a schema object
 		transit().from(PARAMETER).via("schema").to(SCHEMA); // valid if `in == "body"`

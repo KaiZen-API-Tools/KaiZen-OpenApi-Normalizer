@@ -6,7 +6,7 @@ import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import java.util.regex.Pattern;
 
 /**
  * Class for defining and moving through a state machine.
@@ -26,13 +26,19 @@ import java.util.Map.Entry;
  * Each transit defines a path from a start state to an end state along one or
  * more labeled edges.
  * <p>
- * Labels are strings. There are two wildcard labels:
+ * Labels are strings. There are three wildcard labels:
  * 
  * <ul>
  * <li><code>"*"</code> - matches any string
+ * <li><code>"re: ..." - Java regular expression; whatever follows <code>re:</code>
+ * is trimmed and then parsed as a Java regular expression. The label will match
+ * strings that are matched by the regex.
  * <li><code>"#"</code> - matches any integer
  * </ul>
- * 
+ * Note: in the unlikely event that you need any of the above to be treated as a
+ * literal value instead of a wildcard, precede your desired value with a colon;
+ * if you want a label to start with a colon, start with two colons.
+ * <p>
  * Once the transits ave been defined, a Tracker can be created and used to move
  * through the state machine.
  * <p>
@@ -42,6 +48,10 @@ import java.util.Map.Entry;
  * becomes the new current state. If a string value does not correspond to an
  * edge, a "*" edge, if present, will be used instead. If an int value is
  * provided, a "#" edge will be followed, if present.
+ * <p>
+ * When processing a move, the available edges leading out of the current state
+ * are considered in the order they were added to the machine (via transits or
+ * out-edge copying). The first matching edge is used.
  * <p>
  * The tracker records the "path" - the sequence of move values - and the
  * corresponding history of states. When a move value does not match any edges,
@@ -61,7 +71,9 @@ import java.util.Map.Entry;
 public class StateMachine<E extends Enum<E>> {
 
 	private Map<E, State<E>> namedStates = new HashMap<>();
-	private Map<State<E>, Map<String, State<E>>> graph = new IdentityHashMap<>();
+	private Map<State<E>, List<Edge<E>>> graph = new IdentityHashMap<>();
+	private Map<State<E>, Map<String, State<E>>> graphCache = new IdentityHashMap<>();
+	private Map<State<E>, State<E>> graphIntCache = new IdentityHashMap<>();
 	private E anonymousValue = null;
 	private E offRoadValue = null;
 	private Class<E> stateClass;
@@ -87,6 +99,39 @@ public class StateMachine<E extends Enum<E>> {
 		this.stateClass = stateClass;
 		this.anonymousValue = anonymousValue;
 		this.offRoadValue = offRoadValue;
+	}
+
+	public State<E> getMoveTarget(State<E> start, String value) {
+		if (graphCache.containsKey(start)) {
+			if (graphCache.get(start).containsKey(value)) {
+				return graphCache.get(start).get(value);
+			}
+		}
+		for (Edge<E> edge : getOutEdges(start)) {
+			if (edge.matches(value)) {
+				cacheMove(start, value, edge.getTarget());
+				return edge.getTarget();
+			}
+		}
+		return null;
+	}
+
+	public State<E> getMoveTarget(State<E> start, int value) {
+		if (!graphIntCache.containsKey(start)) {
+			for (Edge<E> edge : getOutEdges(start)) {
+				if (edge.matches(value)) {
+					graphIntCache.put(start, edge.getTarget());
+				}
+			}
+		}
+		return graphIntCache.get(start);
+	}
+
+	public void cacheMove(State<E> from, String value, State<E> to) {
+		if (!graphCache.containsKey(from)) {
+			graphCache.put(from, new HashMap<String, State<E>>());
+		}
+		graphCache.get(from).put(value, to);
 	}
 
 	/**
@@ -149,18 +194,49 @@ public class StateMachine<E extends Enum<E>> {
 
 	private void installTransit(TransitDef transit) {
 		State<E> current = transit.getStartState();
-		List<String> edges = transit.getEdges();
-		int size = edges.size();
+		List<String> moves = transit.getMoves();
+		int size = moves.size();
 		for (int i = 0; i < size - 1; i++) {
-			current = installEdge(current, edges.get(i));
+			current = installEdge(current, moves.get(i));
 		}
-		installEdge(current, edges.get(size - 1), transit.getEndState());
+		installEdge(current, moves.get(size - 1), transit.getEndState());
+	}
+
+	private State<E> installEdge(State<E> start, String label) {
+		return installEdge(start, label, null);
+	}
+
+	private State<E> installEdge(State<E> start, String label, State<E> end) {
+		List<Edge<E>> existingEdges = getOutEdges(start);
+		for (Edge<E> existingEdge : existingEdges) {
+			if (existingEdge.getLabel().equals(label)) {
+				State<E> target = existingEdge.getTarget();
+				if (end == null || end == target) {
+					return target;
+				} else {
+					throw new IllegalArgumentException("Multiple edges with label '" + label + "' from same state");
+				}
+			}
+		}
+		// no existing edge with identical label... create new edge, either to provided
+		// end state or to a new anonymous state
+		State<E> target = end != null ? end : new State<E>(anonymousValue);
+		existingEdges.add(new Edge<E>(label, target));
+		return target;
+	}
+
+	private List<Edge<E>> getOutEdges(State<E> state) {
+		if (!graph.containsKey(state)) {
+			graph.put(state, new ArrayList<Edge<E>>());
+		}
+		return graph.get(state);
 	}
 
 	/**
 	 * Copy the outgoing edges from one named state to another.
 	 * 
-	 * Existing edges with the same labels are overwritten.
+	 * Existing edges for the to-state are not affected, but precede the copied
+	 * edges when it comes to matching priority.
 	 * 
 	 * @param from
 	 * @param to
@@ -168,39 +244,12 @@ public class StateMachine<E extends Enum<E>> {
 	public void copyOutEdges(E from, E to) {
 		State<E> fromState = getState(from);
 		State<E> toState = getState(to);
-		Map<String, State<E>> edges = graph.get(fromState);
+		List<Edge<E>> edges = graph.get(fromState);
 		if (edges != null) {
-			for (Entry<String, State<E>> edge : edges.entrySet()) {
-				installEdge(toState, edge.getKey(), edge.getValue());
+			for (Edge<E> edge : edges) {
+				installEdge(toState, edge.getLabel(), edge.getTarget());
 			}
 		}
-	}
-
-	private State<E> installEdge(State<E> from, String edge) {
-		return installEdge(from, edge, null);
-	}
-
-	private State<E> installEdge(State<E> from, String edge, State<E> to) {
-		if (!graph.containsKey(from)) {
-			graph.put(from, new HashMap<>());
-		}
-		State<E> target = graph.get(from).get(edge);
-		if (target != null) {
-			// edge already exists - must match to-state if provided
-			if (to != null && to != target) {
-				throw new IllegalArgumentException();
-			}
-		} else {
-			// edge not in graph - use given to-state if provided
-			target = to;
-			if (target == null) {
-				// else allocate a new state as target
-				target = new State<E>(anonymousValue);
-			}
-			// install this as a new edge in the graph
-			graph.get(from).put(edge, target);
-		}
-		return target;
 	}
 
 	public State<E> getState(E name) {
@@ -215,8 +264,70 @@ public class StateMachine<E extends Enum<E>> {
 		return getState(Enum.valueOf(stateClass, name));
 	}
 
-	private Map<String, State<E>> getOutEdges(State<E> state) {
-		return graph.get(state);
+	public static class Edge<E extends Enum<E>> {
+		private String label;
+		private State<E> target;
+		private EdgeType type;
+		private Pattern pattern = null;
+		private String value = null;
+
+		public Edge(String label, State<E> target) {
+			this.label = label;
+			this.target = target;
+			if (label.equals("#")) {
+				this.type = EdgeType.INTEGER;
+			} else if (label.equals("*")) {
+				this.pattern = Pattern.compile(".*");
+				this.type = EdgeType.REGEX;
+			} else if (label.startsWith("re:")) {
+				this.pattern = Pattern.compile(label.substring(3).trim());
+				this.type = EdgeType.REGEX;
+			} else {
+				this.value = label.startsWith(":") ? label.substring(1) : label;
+				this.type = EdgeType.FIXED_STRING;
+			}
+		}
+
+		public String getLabel() {
+			return label;
+		}
+
+		public EdgeType getType() {
+			return type;
+		}
+
+		public String getFixedValue() {
+			return value;
+		}
+
+		public Pattern getRegex() {
+			return pattern;
+		}
+
+		public boolean matches(String s) {
+			switch (type) {
+			case FIXED_STRING:
+				return value.equals(s);
+			case REGEX:
+				return pattern.matcher(s).matches();
+			case INTEGER:
+				return false;
+			default:
+				return false;
+			}
+		}
+
+		public boolean matches(int i) {
+			return type == EdgeType.INTEGER;
+		}
+
+		public State<E> getTarget() {
+			return target;
+		}
+
+		public enum EdgeType {
+			FIXED_STRING, REGEX, INTEGER
+		};
 	}
 
 	/**
@@ -231,7 +342,7 @@ public class StateMachine<E extends Enum<E>> {
 	 */
 	public class TransitDef {
 		State<E> startState = null;
-		List<String> edges = new ArrayList<>();
+		List<String> moves = new ArrayList<>();
 		State<E> endState = null;
 
 		/**
@@ -241,7 +352,7 @@ public class StateMachine<E extends Enum<E>> {
 		 * @return
 		 */
 		public TransitDef from(E start) {
-			if (startState != null || !edges.isEmpty() || endState != null) {
+			if (startState != null || !moves.isEmpty() || endState != null) {
 				throw new IllegalStateException();
 			}
 			this.startState = getState(start);
@@ -251,14 +362,14 @@ public class StateMachine<E extends Enum<E>> {
 		/**
 		 * Provide labels for the edges that will be used/created for the transit
 		 * 
-		 * @param edges
+		 * @param moves
 		 * @return
 		 */
-		public TransitDef via(String... edges) {
+		public TransitDef via(String... moves) {
 			if (startState == null || endState != null) {
 				throw new IllegalStateException();
 			}
-			this.edges.addAll(Arrays.asList(edges));
+			this.moves.addAll(Arrays.asList(moves));
 			return this;
 		}
 
@@ -268,7 +379,7 @@ public class StateMachine<E extends Enum<E>> {
 		 * @param end
 		 */
 		public void to(E end) {
-			if (startState == null || edges.isEmpty() || endState != null) {
+			if (startState == null || moves.isEmpty() || endState != null) {
 				throw new IllegalStateException();
 			}
 			this.endState = getState(end);
@@ -279,8 +390,8 @@ public class StateMachine<E extends Enum<E>> {
 			return startState;
 		}
 
-		public List<String> getEdges() {
-			return edges;
+		public List<String> getMoves() {
+			return moves;
 		}
 
 		public State<E> getEndState() {
@@ -333,27 +444,27 @@ public class StateMachine<E extends Enum<E>> {
 		/**
 		 * Move to a new state based on a string value
 		 * 
-		 * @param edgeValue
+		 * @param value
 		 *            value to match against available edges. An edge labeled "*" will
 		 *            be considered if no non-wild edge matches.
 		 * @return new current state, or null if current state was already null, or if
 		 *         there was no matching edge
 		 */
-		public State<E> move(String edgeValue) {
-			return moveTo(peek(edgeValue, true), edgeValue);
+		public State<E> move(String value) {
+			return moveTo(peek(value), value);
 		}
 
 		/**
 		 * Move to a new state based on an int value
 		 * 
-		 * @param edgeValue
+		 * @param value
 		 *            integer value. Only an edge labeled "#" can match. N.B. An edge
 		 *            labeled with Integer.toString(edgeValue) will NOT match.
 		 * @return new current state, or null if current state was already null, or if
 		 *         there was no matching edge
 		 */
-		public State<E> move(int edgeValue) {
-			return moveTo(peek("#", false), edgeValue);
+		public State<E> move(int value) {
+			return moveTo(peek(value), value);
 		}
 
 		private State<E> moveTo(State<E> newState, Object edgeValue) {
@@ -370,31 +481,25 @@ public class StateMachine<E extends Enum<E>> {
 		 * Determine the state that would be current after a move to the given value,
 		 * but don't actually perform the move.
 		 * 
-		 * @param edgeValue
-		 * @param wildOk
-		 *            whether to consider an edge labeled "*"
+		 * @param value
+		 * 
 		 * @return the state that would become current, or null if the current state is
 		 *         already null or if there is no matching edge
 		 */
-		public State<E> peek(String edgeValue, boolean wildOk) {
-			Map<String, State<E>> edges = machine.getOutEdges(currentState);
-			State<E> result = edges != null ? edges.get(edgeValue) : null;
-			if (result == null && wildOk) {
-				result = edges != null ? edges.get("*") : null;
-			}
-			return result;
+		public State<E> peek(String value) {
+			return machine.getMoveTarget(currentState, value);
 		}
 
 		/**
-		 * Determine the state that would be current after a mvoe to the given value,
+		 * Determine the state that would be current after a move to the given value,
 		 * but don't actually perform the move.
 		 * 
-		 * @param edgeValue
+		 * @param value
 		 * @return the state that would become current, or null if the current state is
 		 *         already null or if there is no matching edge
 		 */
-		public State<E> peek(int edgeValue) {
-			return peek("#", false);
+		public State<E> peek(int value) {
+			return machine.getMoveTarget(currentState, value);
 		}
 
 		/**

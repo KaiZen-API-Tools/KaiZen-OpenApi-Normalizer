@@ -8,6 +8,7 @@ info:
 servers:
   - url: https://api.beamup.com/v1
 paths:
+  x-extension: Caught you! Fix the state machine NOW.
   /products:
     get:
       summary: Product Types
