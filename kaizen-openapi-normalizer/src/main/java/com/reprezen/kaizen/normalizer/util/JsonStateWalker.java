@@ -136,9 +136,10 @@ public class JsonStateWalker<E extends Enum<E>> {
 		boolean replaced = false;
 		boolean descend = true;
 		boolean keepVisiting = state != null ? (state.isAnonymous() ? visitAnonymousStates : true) : walkOffRoad;
-		// don't descend into children if we're not visiting this node in the first
-		// place
-		Disposition disp = keepVisiting ? Disposition.descend() : Disposition.done();
+		// set up default disposition if we're not visiting this state:
+		// - descend if because it's anonymous (we may hit named states during descent)
+		// - done if because we're off-road (we'll be off-road throughout descent)
+		Disposition disp = state != null || walkOffRoad ? Disposition.descend() : Disposition.done();
 		while (keepVisiting) {
 			State<E> currentState = tracker.getCurrentState();
 			disp = visitMethod.visit(node, currentState,
