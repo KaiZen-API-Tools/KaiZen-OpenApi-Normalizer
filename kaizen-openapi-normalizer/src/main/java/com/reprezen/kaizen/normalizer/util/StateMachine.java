@@ -33,7 +33,8 @@ import java.util.regex.Pattern;
  * <li><code>"re: ..." - Java regular expression; whatever follows <code>re:</code>
  * is trimmed and then parsed as a Java regular expression. The label will match
  * strings that are matched by the regex.
- * <li><code>"#"</code> - matches any integer
+ * <li><code>"#"</code> - matches any integer (i.e. a move using an integer
+ * value, not a string that looks like an integer)
  * </ul>
  * Note: in the unlikely event that you need any of the above to be treated as a
  * literal value instead of a wildcard, precede your desired value with a colon;
@@ -44,14 +45,10 @@ import java.util.regex.Pattern;
  * <p>
  * The tracker is instantiated with an enum identifying the start state.
  * Thereafter, the tracker can be "moved" by providing a string or integer
- * value. If a matching edge exists from the current state, its destination
- * becomes the new current state. If a string value does not correspond to an
- * edge, a "*" edge, if present, will be used instead. If an int value is
- * provided, a "#" edge will be followed, if present.
- * <p>
- * When processing a move, the available edges leading out of the current state
- * are considered in the order they were added to the machine (via transits or
- * out-edge copying). The first matching edge is used.
+ * value. The first matching edge originating in the current state, if any,
+ * determines the new current state. Edge ordering is determined by the order of
+ * the {@link #transit()} and/or {@link #copyOutEdges(Enum, Enum)} operations
+ * performed when defining the machine.
  * <p>
  * The tracker records the "path" - the sequence of move values - and the
  * corresponding history of states. When a move value does not match any edges,
@@ -61,7 +58,8 @@ import java.util.regex.Pattern;
  * <p>
  * The tracker can also back up, removing items from the tails of the path and
  * the state history. Backing up when off-road removes the nulls caused by
- * non-matching moves.
+ * non-matching moves. The tracker can also be reset to a given state, which
+ * clears the path and history as a side-effect
  * 
  * @author Andy Lowry
  *
@@ -81,6 +79,9 @@ public class StateMachine<E extends Enum<E>> {
 	/**
 	 * Create a new state machine instance, with no special values for anonymous and
 	 * off-road states.
+	 * 
+	 * @param stateClass
+	 *            class of the state enum type
 	 */
 	public StateMachine(Class<E> stateClass) {
 		this(stateClass, null, null);
@@ -90,6 +91,8 @@ public class StateMachine<E extends Enum<E>> {
 	 * Create a new state machine with special enum values for anonymous and
 	 * off-road states.
 	 * 
+	 * @param stateClass
+	 *            class of the state enum type
 	 * @param anonymousValue
 	 *            value to be used for anonymous states, or null for none
 	 * @param offRoadValue
@@ -101,6 +104,16 @@ public class StateMachine<E extends Enum<E>> {
 		this.offRoadValue = offRoadValue;
 	}
 
+	/**
+	 * Determine the state that the given string move value should move to, by
+	 * considering the given state's out edges
+	 * 
+	 * @param start
+	 *            start state for the presumed move
+	 * @param value
+	 *            value for the move
+	 * @return end state of the presumed move
+	 */
 	public State<E> getMoveTarget(State<E> start, String value) {
 		if (graphCache.containsKey(start)) {
 			if (graphCache.get(start).containsKey(value)) {
@@ -116,6 +129,16 @@ public class StateMachine<E extends Enum<E>> {
 		return null;
 	}
 
+	/**
+	 * Determine the state that the given integer move value should move to, by
+	 * considering the given state's out edges
+	 * 
+	 * @param start
+	 *            start state for the presumed move
+	 * @param value
+	 *            value for the move
+	 * @return end state of the presumed move
+	 */
 	public State<E> getMoveTarget(State<E> start, int value) {
 		if (!graphIntCache.containsKey(start)) {
 			for (Edge<E> edge : getOutEdges(start)) {
@@ -127,7 +150,7 @@ public class StateMachine<E extends Enum<E>> {
 		return graphIntCache.get(start);
 	}
 
-	public void cacheMove(State<E> from, String value, State<E> to) {
+	private void cacheMove(State<E> from, String value, State<E> to) {
 		if (!graphCache.containsKey(from)) {
 			graphCache.put(from, new HashMap<String, State<E>>());
 		}
@@ -239,7 +262,9 @@ public class StateMachine<E extends Enum<E>> {
 	 * edges when it comes to matching priority.
 	 * 
 	 * @param from
+	 *            state whose edges are to be copied
 	 * @param to
+	 *            state that will receive the copies
 	 */
 	public void copyOutEdges(E from, E to) {
 		State<E> fromState = getState(from);
@@ -252,6 +277,15 @@ public class StateMachine<E extends Enum<E>> {
 		}
 	}
 
+	/**
+	 * Return the named state for the given name value.
+	 * <p>
+	 * This method always returns the same state object for the same name value.
+	 * 
+	 * @param name
+	 *            one of the values of the enum used for name states
+	 * @return unique state value for the given name value
+	 */
 	public State<E> getState(E name) {
 		if (!namedStates.containsKey(name)) {
 			State<E> state = new State<E>(name);
@@ -260,10 +294,26 @@ public class StateMachine<E extends Enum<E>> {
 		return namedStates.get(name);
 	}
 
+	/**
+	 * Return the named state for the given enum name value
+	 * <p>
+	 * This is just like {@link #getState(Enum)}, but the enum value is specified by
+	 * its name.
+	 * 
+	 * @param name
+	 * @return
+	 */
 	public State<E> getState(String name) {
 		return getState(Enum.valueOf(stateClass, name));
 	}
 
+	/**
+	 * An edge, characterized by a label and a target state.
+	 * 
+	 * @author Andy Lowry
+	 *
+	 * @param <E>
+	 */
 	public static class Edge<E extends Enum<E>> {
 		private String label;
 		private State<E> target;
@@ -271,6 +321,31 @@ public class StateMachine<E extends Enum<E>> {
 		private Pattern pattern = null;
 		private String value = null;
 
+		/**
+		 * Create a new edge.
+		 * <p>
+		 * Label values are interpreted as follows:
+		 * <dl>
+		 * <dt><code>*</code></dt>
+		 * <dd>Wildcard - equivalent to <code>"re: .*"</code></dd>
+		 * <dt><code>re: <i>regex</i></code></dt>
+		 * <dd>Regex - everything following <code>":re"</code> is interpreted as a Java
+		 * regular expression.</dd>
+		 * <dt><code>#</code></dt>
+		 * <dd>Any integer value (not a string that looks like an integer)</dd>
+		 * <dt><code>:<i>anything</i></code></dt>
+		 * <dd>A fixed-string label defined by the string following the initial
+		 * colon</dd>
+		 * <dt><code><i>anything-else</i></code></dt>
+		 * <dd>A fixed-string label</dd>
+		 * </ul>
+		 * <p>
+		 * 
+		 * @param label
+		 *            the label string
+		 * @param target
+		 *            the target state
+		 */
 		public Edge(String label, State<E> target) {
 			this.label = label;
 			this.target = target;
@@ -288,22 +363,56 @@ public class StateMachine<E extends Enum<E>> {
 			}
 		}
 
+		/**
+		 * Return the label used to define this edge (not any of its interpretations)
+		 * 
+		 * @return
+		 */
 		public String getLabel() {
 			return label;
 		}
 
+		/**
+		 * Return the type of this edge: one of <code>FIXED_STRING</code>,
+		 * <code>REGEX</code>, and <code>INTEGER</code>.
+		 * 
+		 * @return
+		 */
 		public EdgeType getType() {
 			return type;
 		}
 
+		/**
+		 * Return the fixed value determined from the label, if the edge type is
+		 * <code>FIXED_VALUE</code>
+		 * 
+		 * @return the fixed value, or null if this is not a fixed value edge
+		 */
 		public String getFixedValue() {
 			return value;
 		}
 
+		/**
+		 * Return the pattern determined from the label, if the edge type is
+		 * <code>REGEX</code>.
+		 * 
+		 * @return the regex pattern, or null if this is not a regex edge
+		 */
 		public Pattern getRegex() {
 			return pattern;
 		}
 
+		/**
+		 * Determine whether this edge matches a given string value
+		 * 
+		 * @param s
+		 *            the string value
+		 * @return true if this edge matches
+		 */
+		/**
+		 * @param s
+		 * @return
+		 */
 		public boolean matches(String s) {
 			switch (type) {
 			case FIXED_STRING:
@@ -317,10 +426,22 @@ public class StateMachine<E extends Enum<E>> {
 			}
 		}
 
+		/**
+		 * Determine whether this edge matches a given integer value.
+		 * 
+		 * @param i
+		 *            the integer value
+		 * @return true if this edge matches (i.e. its any integer-type edge)
+		 */
 		public boolean matches(int i) {
 			return type == EdgeType.INTEGER;
 		}
 
+		/**
+		 * Get the target state of this edge.
+		 * 
+		 * @return
+		 */
 		public State<E> getTarget() {
 			return target;
 		}
@@ -406,36 +527,50 @@ public class StateMachine<E extends Enum<E>> {
 	 * @author Andy Lowry
 	 *
 	 */
-	/**
-	 * @author Andy Lowry
-	 *
-	 */
 	public static class Tracker<E extends Enum<E>> {
 		private StateMachine<E> machine;
 		private State<E> currentState;
 		private List<State<E>> crumbs = new ArrayList<>();
 		private List<Object> path = new ArrayList<>();
 		private E offRoadValue = null;
+		private State<E> initialStartState;
 
+		/**
+		 * Create a tracker for a given state machine with a given start state
+		 * 
+		 * @param machine
+		 *            the state machine
+		 * @param start
+		 *            the start state enum value
+		 */
 		private Tracker(StateMachine<E> machine, E start) {
 			this(machine, machine.getState(start));
 		}
 
+		/**
+		 * Create a tracker for a given state machine with a given start state
+		 * 
+		 * @param machine
+		 *            the state machine
+		 * @param start
+		 *            the start state value
+		 */
 		private Tracker(StateMachine<E> machine, State<E> start) {
 			this.machine = machine;
 			this.currentState = start;
 			this.offRoadValue = machine.getOffRoadValue();
+			this.initialStartState = start;
 		}
 
 		/**
-		 * Get the machine's current state
+		 * Get the tracker's current state
 		 * 
 		 * If the tracker is off-road, null will be returned unless an off-road enum
 		 * value has been set for the machine. In that case, a new State instance will
 		 * be created and returned, using that value.
 		 * 
-		 * @return the current state, or null if the current path includes a unmatched
-		 *         move.
+		 * @return the current state, or null-or-offroad-state if the current path
+		 *         includes a unmatched move.
 		 */
 		public State<E> getCurrentState() {
 			return currentState;
@@ -445,23 +580,24 @@ public class StateMachine<E extends Enum<E>> {
 		 * Move to a new state based on a string value
 		 * 
 		 * @param value
-		 *            value to match against available edges. An edge labeled "*" will
-		 *            be considered if no non-wild edge matches.
+		 *            value to match against available edges
 		 * @return new current state, or null if current state was already null, or if
-		 *         there was no matching edge
+		 *         there was no matching edge (or the anonymous or off-road state
+		 *         instead of null, if they have been provided for the machine)
 		 */
 		public State<E> move(String value) {
 			return moveTo(peek(value), value);
 		}
 
 		/**
-		 * Move to a new state based on an int value
+		 * Move to a new state based on an integer value
 		 * 
 		 * @param value
 		 *            integer value. Only an edge labeled "#" can match. N.B. An edge
-		 *            labeled with Integer.toString(edgeValue) will NOT match.
+		 *            that matches <code>Integer.toString(value)</code> will NOT match.
 		 * @return new current state, or null if current state was already null, or if
-		 *         there was no matching edge
+		 *         there was no matching edge (or the anonymous or off-road state
+		 *         instead of null, if they have been provided for the machine)
 		 */
 		public State<E> move(int value) {
 			return moveTo(peek(value), value);
@@ -484,7 +620,9 @@ public class StateMachine<E extends Enum<E>> {
 		 * @param value
 		 * 
 		 * @return the state that would become current, or null if the current state is
-		 *         already null or if there is no matching edge
+		 *         already null or if there is no matching edge (or anonymous or
+		 *         off-road state instead of null, if they have been provided for the
+		 *         machine)
 		 */
 		public State<E> peek(String value) {
 			return machine.getMoveTarget(currentState, value);
@@ -496,7 +634,9 @@ public class StateMachine<E extends Enum<E>> {
 		 * 
 		 * @param value
 		 * @return the state that would become current, or null if the current state is
-		 *         already null or if there is no matching edge
+		 *         already null or if there is no matching edge (or anonymous or
+		 *         off-road state instead of null, if they have been provided for the
+		 *         machine)
 		 */
 		public State<E> peek(int value) {
 			return machine.getMoveTarget(currentState, value);
@@ -507,7 +647,9 @@ public class StateMachine<E extends Enum<E>> {
 		 * 
 		 * The final entries on the current path and the state history are removed.
 		 * 
-		 * @return the new current state - may be null if the machine is still off-road
+		 * @return the new current state - may be null if the tracker is still off-road
+		 *         or the new state is anonymous - or the anonymous or off-road state
+		 *         instead of null, if they have been provided for the machine)
 		 */
 		public State<E> backup() {
 			return backup(1);
@@ -519,6 +661,9 @@ public class StateMachine<E extends Enum<E>> {
 		 * @param n
 		 *            number of moves to back out of
 		 * @return the new current state - may be null if the machine is still off-road
+		 *         or if the new state is an anonymous state - or the anonymous or
+		 *         off-road value instead of null if they have been provided for the
+		 *         machine)
 		 */
 		public State<E> backup(int n) {
 			while (n-- > 0) {
@@ -532,22 +677,81 @@ public class StateMachine<E extends Enum<E>> {
 			return currentState;
 		}
 
+		/**
+		 * Reset the tracker to the given state.
+		 * <p>
+		 * This clears the path and state history.
+		 * 
+		 * @param state
+		 *            the state to become the new current state
+		 */
+		public void reset(State<E> state) {
+			this.currentState = state;
+			this.crumbs.clear();
+			this.path.clear();
+		}
+
+		/**
+		 * Reset the tracker to the given state.
+		 * <p>
+		 * This clears the path and state history.
+		 * 
+		 * @param state
+		 *            the enum value for the state to become the new current state
+		 */
+		public void reset(E stateValue) {
+			reset(machine.getState(stateValue));
+		}
+
+		/**
+		 * Reset the tracker to the start state that was specified at its creation.
+		 */
+		public void reset() {
+			reset(this.initialStartState);
+		}
+
+		/**
+		 * Get the list of values that led from the start state to the current state.
+		 * 
+		 * @return list of string and integer values used in moves
+		 */
 		public List<Object> getPath() {
 			return new ArrayList<>(path);
 		}
 	}
 
+	/**
+	 * A state in a state machine.
+	 * <p>
+	 * Encompasses a value from the underlying enum type.
+	 * <p>
+	 * The encompassed value may be null in the case of an anonymous or off-road
+	 * state, if the state machine has not been configured with enum values to use
+	 * for such states.
+	 * 
+	 * @author Andy Lowry
+	 *
+	 * @param <E>
+	 *            the underlying enum type
+	 */
 	public static class State<E extends Enum<E>> {
 		private E value = null;
 
+		/**
+		 * Create a new state for the given enum value
+		 * 
+		 * @param name
+		 *            enum value, or null for anonymous or off-road state
+		 */
 		private State(E name) {
 			this.value = name;
 		}
 
 		/**
-		 * Get this state's name
+		 * Get this state's enum value
 		 * 
-		 * @return the enum naming this state, or null if this is an anonymous state
+		 * @return the enum naming this state. This may be null for an anonymous or
+		 *         off-road state.
 		 */
 		public E getValue() {
 			return value;
@@ -558,5 +762,4 @@ public class StateMachine<E extends Enum<E>> {
 			return String.format("State[%s]", getValue());
 		}
 	}
-
 }

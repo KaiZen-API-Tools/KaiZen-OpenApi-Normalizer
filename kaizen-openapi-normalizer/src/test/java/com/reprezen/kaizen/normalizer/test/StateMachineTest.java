@@ -27,14 +27,15 @@ public class StateMachineTest extends Assert {
 
 	private void defineTransits() {
 		//         ⇗ "shortcut"⇒ ⇒ ⇒ ⇒ ⇘
-		// Ⓐ ⇒ "x" ⇒ "*" ⇒ Ⓑ ⇒ "done" ⇒ Ⓒ
-		//                 ⇙ ⇖
-		//                 int
+		// Ⓐ ⇒ "x*" ⇒ "*" ⇒ Ⓑ ⇒ "done" ⇒ Ⓒ
+		//   ⇘ ⇒  "y*" ⇒ ⇗  ⇙ ⇖
+		//                  int
 		//
-		machine.transit().from(A).via("x", "shortcut").to(C);
+		machine.transit().from(A).via("re: x.*", "shortcut").to(C);
 		machine.transit().from(B).via("#").to(B);
 		machine.transit().from(B).via("done").to(C);
-		machine.transit().from(A).via("x", "*", "y").to(B);
+		machine.transit().from(A).via("re: x.*", "*", "y").to(B);
+		machine.transit().from(A).via("re: y.*").to(B);
 	}
 
 	@Test
@@ -45,6 +46,9 @@ public class StateMachineTest extends Assert {
 	private Tracker<S> performSimpleMoves() {
 		Tracker<S> tracker = machine.tracker(A);
 		checkState(tracker, A);
+		checkMove(tracker, "yellow", B);
+		checkPath(tracker, "yellow");
+		checkReset(tracker, A);
 		checkMove(tracker, "x", null);
 		checkPath(tracker, "x");
 		checkMove(tracker, "hello", null);
@@ -160,6 +164,12 @@ public class StateMachineTest extends Assert {
 
 	private void checkPath(Tracker<S> tracker, Object... expectedPath) {
 		assertEquals(Arrays.asList(expectedPath), tracker.getPath());
+	}
+
+	private void checkReset(Tracker<S> tracker, S value) {
+		tracker.reset(value);
+		checkState(tracker, value);
+		checkPath(tracker);
 	}
 
 	public static enum S {
