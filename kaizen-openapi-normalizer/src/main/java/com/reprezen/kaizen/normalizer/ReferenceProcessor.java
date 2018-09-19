@@ -11,7 +11,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.reprezen.kaizen.normalizer.ReferenceScanner.ScanOp;
 import com.reprezen.kaizen.normalizer.util.JsonCopier;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker;
-import com.reprezen.kaizen.normalizer.util.JsonStateWalker.AdvancedWalkMethod;
+import com.reprezen.kaizen.normalizer.util.JsonStateWalker.AdvancedVisitMethod;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition;
 import com.reprezen.kaizen.normalizer.util.StateMachine;
 import com.reprezen.kaizen.normalizer.util.StateMachine.State;
@@ -73,19 +73,19 @@ public class ReferenceProcessor<E extends Enum<E> & Component> {
 
 	private void copyOtherElements(JsonNode model, ObjectNode result) {
 		Tracker<E> tracker = machine.tracker(modelState);
-		OtherElementWalkMethod<E> walkMethod = new OtherElementWalkMethod<E>(result);
-		new JsonStateWalker<E>(tracker, walkMethod, true, true).walk(model);
+		OtherElementVisitMethod<E> visitMethod = new OtherElementVisitMethod<E>(result);
+		new JsonStateWalker<E>(tracker, visitMethod, true, true).walk(model);
 	}
 
-	private static class OtherElementWalkMethod<E extends Enum<E> & Component> implements AdvancedWalkMethod<E> {
+	private static class OtherElementVisitMethod<E extends Enum<E> & Component> implements AdvancedVisitMethod<E> {
 		private JsonNode target;
 
-		public OtherElementWalkMethod(JsonNode copyTo) {
+		public OtherElementVisitMethod(JsonNode copyTo) {
 			this.target = copyTo;
 		}
 
 		@Override
-		public Disposition walk(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer) {
+		public Disposition visit(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer) {
 			if (stateValue == V2State.OFFROAD) {
 				JsonCopier.copy(node, target, path);
 				return Disposition.done();

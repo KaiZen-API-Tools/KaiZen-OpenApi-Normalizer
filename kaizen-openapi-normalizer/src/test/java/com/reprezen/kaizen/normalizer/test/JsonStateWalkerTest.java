@@ -1,8 +1,9 @@
 package com.reprezen.kaizen.normalizer.test;
 
-import static com.reprezen.kaizen.normalizer.test.JsonStateWalkerTest.WalkResult.walkResult;
-import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.DONE;
-import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.REWALK;
+import static com.reprezen.kaizen.normalizer.test.JsonStateWalkerTest.VisitResult.visitResult;
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.DESCEND;
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.DONE;
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.REVISIT;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -21,9 +22,10 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.TextNode;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker;
-import com.reprezen.kaizen.normalizer.util.JsonStateWalker.AdvancedWalkMethod;
+import com.reprezen.kaizen.normalizer.util.JsonStateWalker.AdvancedVisitMethod;
 import com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition;
-import com.reprezen.kaizen.normalizer.util.JsonStateWalker.SimpleWalkMethod;
+import com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action;
+import com.reprezen.kaizen.normalizer.util.JsonStateWalker.SimpleVisitMethod;
 import com.reprezen.kaizen.normalizer.util.StateMachine;
 import com.reprezen.kaizen.normalizer.util.StateMachine.State;
 import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
@@ -47,62 +49,62 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 
 	@Test
 	public void simpleTest() {
-		SimpleWalkMethod<S> walk = (n, s, v, path, ptr) -> {
+		SimpleVisitMethod<S> visitMehod = (n, s, v, path, ptr) -> {
 		};
-		verifyWalk(tree, machine.tracker(S.TOP), walk, //
-				walkResult(S.TOP, ""), //
-				walkResult(S.A, "/a"), //
-				walkResult(S.A, "/a/a"), //
-				walkResult(S.B, "/a/a/b"), //
-				walkResult(S.C, "/a/a/b/0"), //
-				walkResult(S.C, "/a/a/b/1"), //
-				walkResult(S.C, "/a/a/b/2"), //
-				walkResult(S.C, "/a/a/b/3"), //
-				walkResult(S.OFF, "/a/a/b/3/0"), //
-				walkResult(S.OFF, "/a/a/b/3/1"), //
-				walkResult(S.OFF, "/a/a/b/3/2"), //
-				walkResult(S.B, "/a/b"), //
-				walkResult(S.C, "/a/b/0"), //
-				walkResult(S.C, "/c"));
+		verifyWalk(tree, machine.tracker(S.TOP), visitMehod, //
+				visitResult(S.TOP, ""), //
+				visitResult(S.A, "/a"), //
+				visitResult(S.A, "/a/a"), //
+				visitResult(S.B, "/a/a/b"), //
+				visitResult(S.C, "/a/a/b/0"), //
+				visitResult(S.C, "/a/a/b/1"), //
+				visitResult(S.C, "/a/a/b/2"), //
+				visitResult(S.C, "/a/a/b/3"), //
+				visitResult(S.OFF, "/a/a/b/3/0"), //
+				visitResult(S.OFF, "/a/a/b/3/1"), //
+				visitResult(S.OFF, "/a/a/b/3/2"), //
+				visitResult(S.B, "/a/b"), //
+				visitResult(S.C, "/a/b/0"), //
+				visitResult(S.C, "/c"));
 	}
 
 	@Test
 	public void pruneTest() {
-		AdvancedWalkMethod<S> walk = (n, s, v, path, ptr) -> {
+		AdvancedVisitMethod<S> visitMethod = (n, s, v, path, ptr) -> {
 			return v == S.C ? Disposition.done() : Disposition.normal();
 		};
-		verifyWalk(tree, machine.tracker(S.TOP), walk, //
-				walkResult(S.TOP, ""), //
-				walkResult(S.A, "/a"), //
-				walkResult(S.A, "/a/a"), //
-				walkResult(S.B, "/a/a/b"), //
-				walkResult(S.C, "/a/a/b/0", DONE), //
-				walkResult(S.C, "/a/a/b/1", DONE), //
-				walkResult(S.C, "/a/a/b/2", DONE), //
-				walkResult(S.C, "/a/a/b/3", DONE), //
-				walkResult(S.B, "/a/b"), //
-				walkResult(S.C, "/a/b/0", DONE), //
-				walkResult(S.C, "/c", DONE));
+		verifyWalk(tree, machine.tracker(S.TOP), visitMethod, //
+				visitResult(S.TOP, ""), //
+				visitResult(S.A, "/a"), //
+				visitResult(S.A, "/a/a"), //
+				visitResult(S.B, "/a/a/b"), //
+				visitResult(S.C, "/a/a/b/0", DONE), //
+				visitResult(S.C, "/a/a/b/1", DONE), //
+				visitResult(S.C, "/a/a/b/2", DONE), //
+				visitResult(S.C, "/a/a/b/3", DONE), //
+				visitResult(S.B, "/a/b"), //
+				visitResult(S.C, "/a/b/0", DONE), //
+				visitResult(S.C, "/c", DONE));
 	}
 
 	@Test
 	public void replaceTest() {
-		AdvancedWalkMethod<S> walk = (n, s, v, path, ptr) -> {
-			return v == S.C ? Disposition.done(TextNode.valueOf("replaced")) : Disposition.normal();
+		AdvancedVisitMethod<S> walk = (n, s, v, path, ptr) -> {
+			return v == S.C ? Disposition.done().withReplacement(TextNode.valueOf("replaced")) : Disposition.normal();
 		};
 		JsonNode newTree = verifyWalk(tree, machine.tracker(S.TOP), walk, //
-				walkResult(S.TOP, ""), //
-				walkResult(S.A, "/a"), //
-				walkResult(S.A, "/a/a"), //
-				walkResult(S.B, "/a/a/b"), //
-				walkResult(S.C, "/a/a/b/0", DONE), //
-				walkResult(S.C, "/a/a/b/1", DONE), //
-				walkResult(S.C, "/a/a/b/2", DONE), //
-				walkResult(S.C, "/a/a/b/3", DONE), //
-				walkResult(S.B, "/a/b"), //
-				walkResult(S.C, "/a/b/0", DONE), //
-				walkResult(S.C, "/c", DONE));
-		SimpleWalkMethod<S> checkReplacements = (n, s, v, path, ptr) -> {
+				visitResult(S.TOP, ""), //
+				visitResult(S.A, "/a"), //
+				visitResult(S.A, "/a/a"), //
+				visitResult(S.B, "/a/a/b"), //
+				visitResult(S.C, "/a/a/b/0", DONE), //
+				visitResult(S.C, "/a/a/b/1", DONE), //
+				visitResult(S.C, "/a/a/b/2", DONE), //
+				visitResult(S.C, "/a/a/b/3", DONE), //
+				visitResult(S.B, "/a/b"), //
+				visitResult(S.C, "/a/b/0", DONE), //
+				visitResult(S.C, "/c", DONE));
+		SimpleVisitMethod<S> checkReplacements = (n, s, v, path, ptr) -> {
 			if (v == S.C) {
 				assertEquals("Replacement failed", TextNode.valueOf("replaced"), n);
 			}
@@ -111,29 +113,26 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 	}
 
 	@Test
-	public void rewalkTest() {
-		AdvancedWalkMethod<S> walk = (n, s, v, path, ptr) -> {
+	public void revisitTest() {
+		AdvancedVisitMethod<S> visit = (n, s, v, path, ptr) -> {
 			if (v == S.B) {
 				JsonNode replacement = arrayNode(TextNode.valueOf("x"));
-				return Disposition.rewalk(n.equals(replacement) ? null : replacement);
-				// if (!n.equals(replacement)) {
-				// return Disposition.rewalk(replacement);
-				// }
+				return Disposition.revisit().withReplacement(n.equals(replacement) ? null : replacement);
 			}
 			return Disposition.normal();
 		};
-		JsonNode newTree = verifyWalk(tree, machine.tracker(S.TOP), walk, //
-				walkResult(S.TOP, ""), //
-				walkResult(S.A, "/a"), //
-				walkResult(S.A, "/a/a"), //
-				walkResult(S.B, "/a/a/b", REWALK), //
-				walkResult(S.B, "/a/a/b", REWALK), //
-				walkResult(S.C, "/a/a/b/0"), //
-				walkResult(S.B, "/a/b", REWALK), //
-				walkResult(S.B, "/a/b", REWALK), //
-				walkResult(S.C, "/a/b/0"), //
-				walkResult(S.C, "/c"));
-		SimpleWalkMethod<S> checkReplacements = (n, s, v, path, ptr) -> {
+		JsonNode newTree = verifyWalk(tree, machine.tracker(S.TOP), visit, //
+				visitResult(S.TOP, ""), //
+				visitResult(S.A, "/a"), //
+				visitResult(S.A, "/a/a"), //
+				visitResult(S.B, "/a/a/b", REVISIT), //
+				visitResult(S.B, "/a/a/b", REVISIT), //
+				visitResult(S.C, "/a/a/b/0"), //
+				visitResult(S.B, "/a/b", REVISIT), //
+				visitResult(S.B, "/a/b", REVISIT), //
+				visitResult(S.C, "/a/b/0"), //
+				visitResult(S.C, "/c"));
+		SimpleVisitMethod<S> checkReplacements = (n, s, v, path, ptr) -> {
 			if (v == S.B) {
 				assertEquals("Replacement failed at " + ptr, arrayNode(TextNode.valueOf("x")), n);
 			}
@@ -148,20 +147,20 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 		return array;
 	}
 
-	private <E extends Enum<E>> void verifyWalk(JsonNode tree, Tracker<E> tracker, SimpleWalkMethod<E> walkMethod,
-			WalkResult<?>... expected) {
-		verifyWalk(tree, tracker, walkMethod.asAdvancedWalkMethod(), expected);
+	private <E extends Enum<E>> void verifyWalk(JsonNode tree, Tracker<E> tracker, SimpleVisitMethod<E> walkMethod,
+			VisitResult<?>... expected) {
+		verifyWalk(tree, tracker, walkMethod.asAdvancedVisitMethod(), expected);
 	}
 
-	private <E extends Enum<E>> JsonNode verifyWalk(JsonNode tree, Tracker<E> tracker, AdvancedWalkMethod<E> walkMethod,
-			WalkResult<?>... expected) {
-		List<WalkResult<E>> results = new ArrayList<>();
-		AdvancedWalkMethod<E> wrappedWalkMethod = new AdvancedWalkMethod<E>() {
+	private <E extends Enum<E>> JsonNode verifyWalk(JsonNode tree, Tracker<E> tracker,
+			AdvancedVisitMethod<E> visitMethod, VisitResult<?>... expected) {
+		List<VisitResult<E>> results = new ArrayList<>();
+		AdvancedVisitMethod<E> wrappedWalkMethod = new AdvancedVisitMethod<E>() {
 			@Override
-			public Disposition walk(JsonNode node, State<E> state, E stateValue, List<Object> path,
+			public Disposition visit(JsonNode node, State<E> state, E stateValue, List<Object> path,
 					JsonPointer pointer) {
-				Disposition disp = walkMethod.walk(node, state, stateValue, path, pointer);
-				results.add(walkResult(stateValue, pointer.toString(), disp.getAction()));
+				Disposition disp = visitMethod.visit(node, state, stateValue, path, pointer);
+				results.add(visitResult(stateValue, pointer.toString(), disp.getAction()));
 				return disp;
 			}
 		};
@@ -170,7 +169,7 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 		return newTree.isPresent() ? newTree.get() : tree;
 	}
 
-	private <E extends Enum<E>> void checkWalkResults(List<WalkResult<?>> expected, List<WalkResult<E>> actual) {
+	private <E extends Enum<E>> void checkWalkResults(List<VisitResult<?>> expected, List<VisitResult<E>> actual) {
 		for (int i = 0; i < expected.size() && i < actual.size(); i++) {
 			assertEquals("Walk result #" + i + " is incorrect", expected.get(i), actual.get(i));
 		}
@@ -182,23 +181,23 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 		}
 	}
 
-	public static class WalkResult<E extends Enum<E>> {
+	public static class VisitResult<E extends Enum<E>> {
 		E stateValue;
 		JsonPointer pointer;
-		String action;
+		Action action;
 
-		private WalkResult(E stateValue, JsonPointer pointer, String action) {
+		private VisitResult(E stateValue, JsonPointer pointer, Action action) {
 			this.stateValue = stateValue;
 			this.pointer = pointer;
 			this.action = action;
 		}
 
-		public static <E extends Enum<E>> WalkResult<E> walkResult(E stateValue, String pointer, String action) {
-			return new WalkResult<E>(stateValue, JsonPointer.compile(pointer), action);
+		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer, Action action) {
+			return new VisitResult<E>(stateValue, JsonPointer.compile(pointer), action);
 		}
 
-		public static <E extends Enum<E>> WalkResult<E> walkResult(E stateValue, String pointer) {
-			return walkResult(stateValue, pointer, Disposition.DESCEND);
+		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer) {
+			return visitResult(stateValue, pointer, DESCEND);
 		}
 
 		@Override
@@ -224,7 +223,7 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			WalkResult<?> other = (WalkResult<?>) obj;
+			VisitResult<?> other = (VisitResult<?>) obj;
 			if (action == null) {
 				if (other.action != null)
 					return false;

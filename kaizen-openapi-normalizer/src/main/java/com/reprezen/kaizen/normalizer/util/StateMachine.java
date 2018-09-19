@@ -243,7 +243,7 @@ public class StateMachine<E extends Enum<E>> {
 		}
 		// no existing edge with identical label... create new edge, either to provided
 		// end state or to a new anonymous state
-		State<E> target = end != null ? end : new State<E>(anonymousValue);
+		State<E> target = end != null ? end : new State<E>(anonymousValue, true);
 		existingEdges.add(new Edge<E>(label, target));
 		return target;
 	}
@@ -288,7 +288,7 @@ public class StateMachine<E extends Enum<E>> {
 	 */
 	public State<E> getState(E name) {
 		if (!namedStates.containsKey(name)) {
-			State<E> state = new State<E>(name);
+			State<E> state = new State<E>(name, false);
 			namedStates.put(name, state);
 		}
 		return namedStates.get(name);
@@ -605,7 +605,7 @@ public class StateMachine<E extends Enum<E>> {
 
 		private State<E> moveTo(State<E> newState, Object edgeValue) {
 			if (newState == null && offRoadValue != null) {
-				newState = new State<E>(offRoadValue);
+				newState = new State<E>(offRoadValue, false);
 			}
 			crumbs.add(currentState);
 			path.add(edgeValue);
@@ -718,6 +718,16 @@ public class StateMachine<E extends Enum<E>> {
 		public List<Object> getPath() {
 			return new ArrayList<>(path);
 		}
+
+		/**
+		 * Return the value used for off-road states, if one has been provided for the
+		 * machine
+		 * 
+		 * @return off-road value, or null if none has been provided
+		 */
+		public E getOffRoadValue() {
+			return offRoadValue;
+		}
 	}
 
 	/**
@@ -736,15 +746,20 @@ public class StateMachine<E extends Enum<E>> {
 	 */
 	public static class State<E extends Enum<E>> {
 		private E value = null;
+		private boolean anonymous;
 
 		/**
 		 * Create a new state for the given enum value
 		 * 
-		 * @param name
-		 *            enum value, or null for anonymous or off-road state
+		 * @param value
+		 *            enum value, or null for an off-road state; may also be null for an
+		 *            anonymous state
+		 * @param anonymous
+		 *            whether this is an anonymous state
 		 */
-		private State(E name) {
-			this.value = name;
+		private State(E value, boolean anonymous) {
+			this.value = value;
+			this.anonymous = anonymous;
 		}
 
 		/**
@@ -755,6 +770,10 @@ public class StateMachine<E extends Enum<E>> {
 		 */
 		public E getValue() {
 			return value;
+		}
+
+		public boolean isAnonymous() {
+			return anonymous;
 		}
 
 		@Override

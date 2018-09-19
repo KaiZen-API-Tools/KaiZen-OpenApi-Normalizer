@@ -1,5 +1,9 @@
 package com.reprezen.kaizen.normalizer.util;
 
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.DESCEND;
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.DONE;
+import static com.reprezen.kaizen.normalizer.util.JsonStateWalker.Disposition.Action.REVISIT;
+
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -17,24 +21,29 @@ import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
  * making moves with a supplied tracker whenever descending into child nodes.
  * 
  * The walker is intialized with a {@link Tracker}, as indicated above, as well
- * as a walk method in the form of either an {@link AdvancedWalkMethod} or a
- * {@link SimpleWalkMethod}. As the tree is walked (in a depth-first fashion),
- * the walk method is invoked for each visited node.
+ * as a visitn method in the form of either an {@link AdvancedVisitnMethod} or a
+ * {@link SimpleVisitMethod}. As the tree is walked (in a depth-first fashion),
+ * the visit method is invoked for each visited node.
  * 
- * When walking the children of an object node, the tracker moves to each
- * property name before walking the property value, and then backs up
- * immediately afterward. When walking the children of an array node, the
- * tracker moves to each element index before walking the element, and then
+ * When visiting the children of an object node, the tracker moves to each
+ * property name before visiting the property value, and then backs up
+ * immediately afterward. When visiting the children of an array node, the
+ * tracker moves to each element index before visiting the element, and then
  * backs up immediately afterward.
  * 
- * An advanced walk method is capable of providing a replacement JsonNode value
- * for the node being walked, and it can also control descent into the walked
- * node's children. A simple walk method, in contrast, can do neither of these;
- * descents always happen, and no replacements occur as a result fo the walk.
+ * An advanced visit method is capable of:
+ * <ul>
+ * <li>providing a replacement JsonNode value for the node being visited;</li>
+ * <li>controlling descent into the visited node's children; and</li>
+ * <li>providing a callback method (void, no-arg) to be invoked just before
+ * completing this visit.</li>
+ * <ul>
+ * A simple visit method, in contrast, can do none of these; descents always
+ * happen, and no replacements or callbacks occur as a result of the visit.
  * 
- * The walker can optionally suppress invocation of the walk method whenever the
- * current state reported by the tracker is anonymous, or when the tracker is
- * off-road, or both.
+ * The walker can optionally suppress invocation of the visit method whenever
+ * the current state reported by the tracker is anonymous, or when the tracker
+ * is off-road, or both.
  * 
  * @author Andy Lowry
  *
@@ -43,8 +52,8 @@ import com.reprezen.kaizen.normalizer.util.StateMachine.Tracker;
 public class JsonStateWalker<E extends Enum<E>> {
 
 	private Tracker<E> tracker;
-	private AdvancedWalkMethod<E> walkMethod;
-	private boolean walkAnonymousStates;
+	private AdvancedVisitMethod<E> visitMethod;
+	private boolean visitAnonymousStates;
 	private boolean walkOffRoad;
 
 	/**
@@ -52,59 +61,59 @@ public class JsonStateWalker<E extends Enum<E>> {
 	 * 
 	 * @param tracker
 	 *            the tracker to use during the walk
-	 * @param walkMethod
-	 *            the walk method to invoke
+	 * @param visitMethod
+	 *            the visit method to invoke
 	 */
-	public JsonStateWalker(Tracker<E> tracker, SimpleWalkMethod<E> walkMethod) {
-		this(tracker, walkMethod, false, false);
+	public JsonStateWalker(Tracker<E> tracker, SimpleVisitMethod<E> visitMethod) {
+		this(tracker, visitMethod, false, false);
 	}
 
 	/**
-	 * Create a walker with a simple walk method
+	 * Create a walker with a simple visit method
 	 * 
 	 * @param tracker
 	 *            the tracker to use during the walk
-	 * @param walkMethod
-	 *            the walk method to invoke
-	 * @param walkAnonymousStates
-	 *            whether to walk nodes corresponding to anonymous machine states
+	 * @param visitMethod
+	 *            the visit method to invoke
+	 * @param visitAnonymousStates
+	 *            whether to visit nodes corresponding to anonymous machine states
 	 * @param walkOffRoad
-	 *            whether to walk nodes when the tracker is off-road
+	 *            whether to visit nodes when the tracker is off-road
 	 */
-	public JsonStateWalker(Tracker<E> tracker, SimpleWalkMethod<E> walkMethod, boolean walkAnonymousStates,
+	public JsonStateWalker(Tracker<E> tracker, SimpleVisitMethod<E> visitMethod, boolean visitAnonymousStates,
 			boolean walkOffRoad) {
-		this(tracker, walkMethod.asAdvancedWalkMethod(), walkAnonymousStates, walkOffRoad);
+		this(tracker, visitMethod.asAdvancedVisitMethod(), visitAnonymousStates, walkOffRoad);
 	}
 
 	/**
-	 * Create a walker with an advanced walk method
+	 * Create a walker with an advanced visit method
 	 * 
 	 * @param tracker
 	 *            the tracker to use during the walk
-	 * @param walkMethod
-	 *            the walk method to invoke
+	 * @param visitMethod
+	 *            the visit method to invoke
 	 */
-	public JsonStateWalker(Tracker<E> tracker, AdvancedWalkMethod<E> walkMethod) {
-		this(tracker, walkMethod, false, false);
+	public JsonStateWalker(Tracker<E> tracker, AdvancedVisitMethod<E> visitMethod) {
+		this(tracker, visitMethod, false, false);
 	}
 
 	/**
-	 * Create a walker with an advanced walk method
+	 * Create a walker with an advanced visit method
 	 * 
 	 * @param tracker
 	 *            the tracker to use during the walk
-	 * @param walkMethod
-	 *            the walk method to invoke
-	 * @param walkAnonymousStates
-	 *            whether to walk nodes corresponding to anonymous machine states
+	 * @param visitMethod
+	 *            the visit method to invoke
+	 * @param visitAnonymousStates
+	 *            whether to visit nodes corresponding to anonymous machine states
 	 * @param walkOffRoad
-	 *            whether to walk nodes when the tracker is off-road
+	 *            whether to visit nodes when the tracker is off-road
 	 */
-	public JsonStateWalker(Tracker<E> tracker, AdvancedWalkMethod<E> walkMethod, boolean walkAnonymousStates,
+	public JsonStateWalker(Tracker<E> tracker, AdvancedVisitMethod<E> visitMethod, boolean visitAnonymousStates,
 			boolean walkOffRoad) {
 		this.tracker = tracker;
-		this.walkMethod = walkMethod;
-		this.walkAnonymousStates = walkAnonymousStates;
+		this.visitMethod = visitMethod;
+		this.visitAnonymousStates = visitAnonymousStates;
 		this.walkOffRoad = walkOffRoad;
 	}
 
@@ -112,40 +121,48 @@ public class JsonStateWalker<E extends Enum<E>> {
 	 * Perform the walk
 	 * 
 	 * @param node
-	 *            JsonNode value to walk
-	 * @return optional replacement node. This will be present if the walk method
+	 *            root of the JsonNode tree to walk
+	 * @return optional replacement node. This will be present if the visit method
 	 *         specified a replacement for the provided top-level node. Replacements
 	 *         of interior nodes are done in-place and will therefore be reflected
 	 *         in the provided node whether or not that node is replaced.
 	 */
 	public Optional<JsonNode> walk(JsonNode node) {
+		return visit(node);
+	}
+
+	private Optional<JsonNode> visit(JsonNode node) {
 		State<E> state = tracker.getCurrentState();
 		boolean replaced = false;
 		boolean descend = true;
-		boolean keepWalking = state != null ? state.getValue() != null ? true : walkAnonymousStates : walkOffRoad;
-		while (keepWalking) {
+		boolean keepVisiting = state != null ? (state.isAnonymous() ? visitAnonymousStates : true) : walkOffRoad;
+		// don't descend into children if we're not visiting this node in the first
+		// place
+		Disposition disp = keepVisiting ? Disposition.descend() : Disposition.done();
+		while (keepVisiting) {
 			State<E> currentState = tracker.getCurrentState();
-			Disposition disp = walkMethod.walk(node, currentState,
-					currentState != null ? currentState.getValue() : null, tracker.getPath(), getPointer(tracker));
+			disp = visitMethod.visit(node, currentState,
+					currentState != null ? currentState.getValue() : tracker.getOffRoadValue(), tracker.getPath(),
+					getPointer(tracker));
 			JsonNode replacement = disp.getReplacement();
 			boolean replacedThisTime = false;
-			// don't do a rewalk unless it specifies a replacement node that is different
+			// don't do a revisit unless it specifies a replacement node that is different
 			// (as in ==, not Object#equals) from the the current node
 			if (replacement != null && replacement != node) {
 				node = replacement;
 				replacedThisTime = replaced = true;
 			}
 			switch (disp.getAction()) {
-			case Disposition.DESCEND:
-				keepWalking = false;
+			case DESCEND:
+				keepVisiting = false;
 				break;
-			case Disposition.REWALK:
+			case REVISIT:
 				if (!replacedThisTime) {
-					keepWalking = false;
+					keepVisiting = false;
 				}
 				break;
-			case Disposition.DONE:
-				keepWalking = false;
+			case DONE:
+				keepVisiting = false;
 				descend = false;
 				break;
 			}
@@ -157,6 +174,9 @@ public class JsonStateWalker<E extends Enum<E>> {
 				walkArray((ArrayNode) node);
 			}
 		}
+		if (disp.getCallback() != null) {
+			disp.getCallback().call();
+		}
 		return replaced ? Optional.of(node) : Optional.empty();
 	}
 
@@ -164,7 +184,7 @@ public class JsonStateWalker<E extends Enum<E>> {
 		for (Iterator<String> iter = node.fieldNames(); iter.hasNext();) {
 			String name = iter.next();
 			tracker.move(name);
-			Optional<JsonNode> replacement = walk(node.get(name));
+			Optional<JsonNode> replacement = visit(node.get(name));
 			if (replacement.isPresent()) {
 				node.set(name, replacement.get());
 			}
@@ -175,7 +195,7 @@ public class JsonStateWalker<E extends Enum<E>> {
 	private void walkArray(ArrayNode node) {
 		for (int i = 0; i < node.size(); i++) {
 			tracker.move(i);
-			Optional<JsonNode> replacement = walk(node.get(i));
+			Optional<JsonNode> replacement = visit(node.get(i));
 			if (replacement.isPresent()) {
 				node.set(i, replacement.get());
 			}
@@ -192,9 +212,9 @@ public class JsonStateWalker<E extends Enum<E>> {
 	}
 
 	@FunctionalInterface
-	public interface AdvancedWalkMethod<E extends Enum<E>> {
+	public interface AdvancedVisitMethod<E extends Enum<E>> {
 		/**
-		 * Process a JsonNode value during a state walk
+		 * Process a JsonNode value during a state visit
 		 * 
 		 * @param node
 		 *            The node to process
@@ -212,13 +232,13 @@ public class JsonStateWalker<E extends Enum<E>> {
 		 * @return disposition information, including how to proceed and an optional
 		 *         replacement for this node
 		 */
-		Disposition walk(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer);
+		Disposition visit(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer);
 	}
 
 	@FunctionalInterface
-	public interface SimpleWalkMethod<E extends Enum<E>> {
+	public interface SimpleVisitMethod<E extends Enum<E>> {
 		/**
-		 * Like {@link AdvancedWalkMethod} but with no return value; normal disposition
+		 * Like {@link AdvancedVisitMethod} but with no return value; normal disposition
 		 * is always used.
 		 * 
 		 * @param node
@@ -235,20 +255,20 @@ public class JsonStateWalker<E extends Enum<E>> {
 		 *            JsonPointer specifying location of node in overall walked tree
 		 *            (constructed from tracker path)
 		 */
-		void walk(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer);
+		void visit(JsonNode node, State<E> state, E stateValue, List<Object> path, JsonPointer pointer);
 
 		/**
-		 * Method to deliver an advanced walk method that is equivalent to this simple
-		 * walk method
+		 * Method to deliver an advanced visit method that is equivalent to this simple
+		 * visit method
 		 * 
-		 * @return equivalent {@link AdvancedWalkMethod}
+		 * @return equivalent {@link AdvancedVisitMethod}
 		 */
-		default AdvancedWalkMethod<E> asAdvancedWalkMethod() {
-			return new AdvancedWalkMethod<E>() {
+		default AdvancedVisitMethod<E> asAdvancedVisitMethod() {
+			return new AdvancedVisitMethod<E>() {
 				@Override
-				public Disposition walk(JsonNode node, State<E> state, E stateValue, List<Object> path,
+				public Disposition visit(JsonNode node, State<E> state, E stateValue, List<Object> path,
 						JsonPointer pointer) {
-					SimpleWalkMethod.this.walk(node, state, stateValue, path, pointer);
+					SimpleVisitMethod.this.visit(node, state, stateValue, path, pointer);
 					return Disposition.normal();
 				}
 			};
@@ -256,47 +276,43 @@ public class JsonStateWalker<E extends Enum<E>> {
 	}
 
 	/**
-	 * Specify the what to do after walking a node.
+	 * Specify the what to do after visiting a node.
 	 *
 	 * The disposition can:
 	 * <ul>
-	 * <li>Provide a replacement value for the walked node</li>
+	 * <li>Provide a replacement value for the visited node</li>
 	 * <li>Specify one of three behaviors wrt descending into child nodes</li>
 	 * <dl>
 	 * <dt>DESCEND</dt>
-	 * <dd>Walk child nodes of the walked node (not of the replacment, if any)</dd>
+	 * <dd>Visit child nodes of the visited node (not of the replacment, if
+	 * any)</dd>
 	 * <dt>REWALK</dt>
-	 * <dd>Walk the replacement node without descending into its children, and then
+	 * <dd>Visit the replacement node without descending into its children, and then
 	 * proceed according to the resulting disposition</dd>
 	 * <dt>DONE</dt>
-	 * <dd>Do not walk the child nodes of the walked node</dd>
+	 * <dd>Do not visit the child nodes of the visited node</dd>
 	 * </dl>
 	 * 
 	 * Note that <b>REWALK</b> is effective ONLY when a replacement node is
-	 * provided, and that replacement is not the same as the walked node. Re-walking
-	 * these conditions are not met is guaranteed to result in an infinite loop,
-	 * assuming a stateless walk method. Absent these conditions, <b>REWALK</b> is
-	 * treated exactly like <b>DESCEND</b>.
+	 * provided, and that replacement is not the same as the visited node.
+	 * Re-visiting these conditions are not met is guaranteed to result in an
+	 * infinite loop, assuming a stateless visit method. Absent these conditions,
+	 * <b>REWALK</b> is treated exactly like <b>DESCEND</b>.
 	 * 
 	 * @author Andy Lowry
 	 *
 	 */
 	public static class Disposition {
-		public static final String DESCEND = "descend";
-		public static final String REWALK = "rewalk";
-		public static final String DONE = "done";
+		public static enum Action {
+			DESCEND, REVISIT, DONE
+		}
 
-		private static final Disposition descendDisposition = descend(null);
-		private static final Disposition rewalkDisposition = rewalk(null);
-		private static final Disposition doneDisposition = done(null);
-		private static final Disposition normalDisposition = descendDisposition;
-
-		private String action;
+		private Action action;
 		private JsonNode replacement;
+		private CallbackMethod callback;
 
-		private Disposition(String action, JsonNode replacement) {
+		private Disposition(Action action) {
 			this.action = action;
-			this.replacement = replacement;
 		}
 
 		/**
@@ -306,39 +322,46 @@ public class JsonStateWalker<E extends Enum<E>> {
 		 * @return
 		 */
 		public static Disposition normal() {
-			return normalDisposition;
+			return descend();
 		}
 
 		public static Disposition descend() {
-			return descendDisposition;
+			return new Disposition(DESCEND);
 		}
 
-		public static Disposition descend(JsonNode replacement) {
-			return new Disposition(DESCEND, replacement);
-		}
-
-		public static Disposition rewalk() {
-			return rewalkDisposition;
-		}
-
-		public static Disposition rewalk(JsonNode replacement) {
-			return new Disposition(REWALK, replacement);
+		public static Disposition revisit() {
+			return new Disposition(REVISIT);
 		}
 
 		public static Disposition done() {
-			return doneDisposition;
+			return new Disposition(DONE);
 		}
 
-		public static Disposition done(JsonNode replacement) {
-			return new Disposition(DONE, replacement);
+		public Disposition withReplacement(JsonNode replacement) {
+			this.replacement = replacement;
+			return this;
 		}
 
-		public String getAction() {
+		public Disposition withCallback(CallbackMethod callback) {
+			this.callback = callback;
+			return this;
+		}
+
+		public Action getAction() {
 			return action;
 		}
 
 		public JsonNode getReplacement() {
 			return replacement;
 		}
+
+		public CallbackMethod getCallback() {
+			return callback;
+		}
+	}
+
+	@FunctionalInterface
+	public interface CallbackMethod {
+		void call();
 	}
 }
