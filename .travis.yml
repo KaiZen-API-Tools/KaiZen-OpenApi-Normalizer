@@ -1,2 +1,2 @@
 language: java
-script: mvn -f kaizen-openapi-normalizer/pom.xml
+script: mvn -f kaizen-openapi-normalizer/pom.xml test
