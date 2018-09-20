@@ -141,6 +141,43 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 
 	}
 
+	@Test
+	public void callbackTest() {
+		AdvancedVisitMethod<S> visit = (n, s, v, path, ptr) -> {
+			return Disposition.descend().withCallback(() -> {
+			});
+		};
+		verifyWalk(tree, machine.tracker(S.TOP), visit, //
+				visitResult(S.TOP, ""), //
+				visitResult(S.A, "/a"), //
+				visitResult(S.A, "/a/a"), //
+				visitResult(S.B, "/a/a/b"), //
+				visitResult(S.C, "/a/a/b/0"), //
+				visitResult(S.C, "/a/a/b/0", true), //
+				visitResult(S.C, "/a/a/b/1"), //
+				visitResult(S.C, "/a/a/b/1", true), //
+				visitResult(S.C, "/a/a/b/2"), //
+				visitResult(S.C, "/a/a/b/2", true), //
+				visitResult(S.C, "/a/a/b/3"), //
+				visitResult(S.OFF, "/a/a/b/3/0"), //
+				visitResult(S.OFF, "/a/a/b/3/0", true), //
+				visitResult(S.OFF, "/a/a/b/3/1"), //
+				visitResult(S.OFF, "/a/a/b/3/1", true), //
+				visitResult(S.OFF, "/a/a/b/3/2"), //
+				visitResult(S.OFF, "/a/a/b/3/2", true), //
+				visitResult(S.C, "/a/a/b/3", true), //
+				visitResult(S.B, "/a/a/b", true), //
+				visitResult(S.A, "/a/a", true), //
+				visitResult(S.B, "/a/b"), //
+				visitResult(S.C, "/a/b/0"), //
+				visitResult(S.C, "/a/b/0", true), //
+				visitResult(S.B, "/a/b", true), //
+				visitResult(S.A, "/a", true), //
+				visitResult(S.C, "/c"), //
+				visitResult(S.C, "/c", true), //
+				visitResult(S.TOP, "", true)); //
+	}
+
 	private ArrayNode arrayNode(JsonNode... elements) {
 		ArrayNode array = JsonNodeFactory.instance.arrayNode();
 		Stream.of(elements).forEach(e -> array.add(e));
@@ -160,8 +197,16 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 			public Disposition visit(JsonNode node, State<E> state, E stateValue, List<Object> path,
 					JsonPointer pointer) {
 				Disposition disp = visitMethod.visit(node, state, stateValue, path, pointer);
+				Disposition wrappedDisp = disp;
+				if (disp.getCallback() != null) {
+					wrappedDisp = new Disposition(disp.getAction()).withReplacement(disp.getReplacement())
+							.withCallback(() -> {
+								results.add(visitResult(stateValue, pointer.toString(), disp.getAction(), true));
+								disp.getCallback().call();
+							});
+				}
 				results.add(visitResult(stateValue, pointer.toString(), disp.getAction()));
-				return disp;
+				return wrappedDisp;
 			}
 		};
 		Optional<JsonNode> newTree = new JsonStateWalker<E>(tracker, wrappedWalkMethod).walk(tree);
@@ -185,24 +230,35 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 		E stateValue;
 		JsonPointer pointer;
 		Action action;
+		boolean inCallback;
 
-		private VisitResult(E stateValue, JsonPointer pointer, Action action) {
+		private VisitResult(E stateValue, JsonPointer pointer, Action action, boolean inCallback) {
 			this.stateValue = stateValue;
 			this.pointer = pointer;
 			this.action = action;
+			this.inCallback = inCallback;
 		}
 
-		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer, Action action) {
-			return new VisitResult<E>(stateValue, JsonPointer.compile(pointer), action);
+		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer, Action action,
+				boolean inCallback) {
+			return new VisitResult<E>(stateValue, JsonPointer.compile(pointer), action, inCallback);
 		}
 
 		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer) {
-			return visitResult(stateValue, pointer, DESCEND);
+			return visitResult(stateValue, pointer, DESCEND, false);
+		}
+
+		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer, Action action) {
+			return visitResult(stateValue, pointer, action, false);
+		}
+
+		public static <E extends Enum<E>> VisitResult<E> visitResult(E stateValue, String pointer, boolean inCallback) {
+			return visitResult(stateValue, pointer, DESCEND, inCallback);
 		}
 
 		@Override
 		public String toString() {
-			return String.format("%s[%s]: %s", pointer, stateValue, action);
+			return String.format("%s[%s]: %s %s", pointer, stateValue, action, inCallback ? " [CB}" : "");
 		}
 
 		@Override
@@ -210,6 +266,7 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 			final int prime = 31;
 			int result = 1;
 			result = prime * result + ((action == null) ? 0 : action.hashCode());
+			result = prime * result + (inCallback ? 1231 : 1237);
 			result = prime * result + ((pointer == null) ? 0 : pointer.hashCode());
 			result = prime * result + ((stateValue == null) ? 0 : stateValue.hashCode());
 			return result;
@@ -223,11 +280,10 @@ public class JsonStateWalkerTest extends NormalizerTestBase {
 				return false;
 			if (getClass() != obj.getClass())
 				return false;
-			VisitResult<?> other = (VisitResult<?>) obj;
-			if (action == null) {
-				if (other.action != null)
-					return false;
-			} else if (!action.equals(other.action))
+			VisitResult other = (VisitResult) obj;
+			if (action != other.action)
+				return false;
+			if (inCallback != other.inCallback)
 				return false;
 			if (pointer == null) {
 				if (other.pointer != null)

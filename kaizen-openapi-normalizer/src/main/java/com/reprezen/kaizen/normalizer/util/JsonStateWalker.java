@@ -312,7 +312,7 @@ public class JsonStateWalker<E extends Enum<E>> {
 		private JsonNode replacement;
 		private CallbackMethod callback;
 
-		private Disposition(Action action) {
+		public Disposition(Action action) {
 			this.action = action;
 		}
 
