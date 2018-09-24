@@ -12,7 +12,7 @@
 	<version>1.0.0</version>
 	<name>${project.groupId}:${project.artifactId}</name>
 	<description>KaiZen OpenAPI Normalizer</description>
-	<url>https://github.com/RepreZen/KaiZen-OpenApi-Normalizer</url>
+	<url>https://github.com/KaiZen-API-Tools//KaiZen-OpenApi-Normalizer</url>
 	<licenses>
 		<license>
 			<name>Eclipse Public License - Version 1.0</name>
@@ -40,9 +40,9 @@
 		</developer>
 	</developers>
 	<scm>
-		<connection>scm:git:git://github.com/RepreZen/KaiZen-OpenApi-Normalizer.git</connection>
-		<developerConnection>scm:git:ssh://github.com:RepreZen/KaiZen-OpenApi-Normalizer.git</developerConnection>
-		<url>https://github.com/RepreZen/KaiZen-OpenApi-Normalizer/tree/master</url>
+		<connection>scm:git@github.com:KaiZen-API-Tools/KaiZen-OpenApi-Normalizer.git</connection>
+		<developerConnection>scm:git:ssh://github.com:KaiZen-API-Tools/KaiZen-OpenApi-Normalizer.git</developerConnection>
+		<url>https://github.com/KaiZen-API-Tools/KaiZen-OpenApi-Normalizer/tree/master</url>
 	</scm>
 	<dependencies>
 		<dependency>
